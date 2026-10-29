@@ -1,0 +1,376 @@
+{
+  "generated_at": "2026-10-29T06:44:13.002646+00:00",
+  "license": "CC BY 4.0",
+  "attribution": "Barack Wanjawa \u2013 Nairobi Securities Exchange daily prices (Mendeley Data)",
+  "datasets": [
+    {
+      "id": "5hk4zw32f5",
+      "version": 1,
+      "doi": "10.17632/5hk4zw32f5.1",
+      "years": "2007-2012"
+    },
+    {
+      "id": "73rb78pmzw",
+      "version": 2,
+      "doi": "10.17632/73rb78pmzw.2",
+      "years": "2013-2020"
+    },
+    {
+      "id": "97hkwn5y3x",
+      "version": 5,
+      "doi": "10.17632/97hkwn5y3x.5",
+      "years": "2021",
+      "version_fallbacks": [
+        4,
+        3
+      ]
+    },
+    {
+      "id": "jmcdmnyh2s",
+      "version": 2,
+      "doi": "10.17632/jmcdmnyh2s.2",
+      "years": "2022"
+    },
+    {
+      "id": "ss5pfw8xnk",
+      "version": 2,
+      "doi": "10.17632/ss5pfw8xnk.2",
+      "years": "2023-2024"
+    },
+    {
+      "id": "2b63rx67xt",
+      "version": 2,
+      "doi": "10.17632/2b63rx67xt.2",
+      "years": "2025",
+      "version_fallbacks": [
+        1
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "data/raw/nse/2b63rx67xt/NSE_data_all_stocks_2025.csv",
+      "sha256": "9a31914d7668787f4c9c49e084e66b8e85594ad8088b3102c550c3e839cd6961",
+      "bytes": 1514879,
+      "rows": 18106,
+      "min_date": "2025-01-02",
+      "max_date": "2025-12-31"
+    },
+    {
+      "path": "data/raw/nse/2b63rx67xt/NSE_data_stock_market_sectors_2025.csv",
+      "sha256": "2f8c118d42cb3d7e7739a8fd5ef798239d693e990ffcb67164e1ec36d525056e",
+      "bytes": 3435,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2007.csv",
+      "sha256": "f053bf99380184351f70e9482db1a8b6d0c75fb62e5dd7d36bf01e33189d680e",
+      "bytes": 854570,
+      "rows": 10608,
+      "min_date": "2007-01-02",
+      "max_date": "2007-12-24"
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2008.csv",
+      "sha256": "6a2dcae78532699806ab820e78bf87eea34a29731dd8c88101de4308b56d7c5e",
+      "bytes": 860256,
+      "rows": 10583,
+      "min_date": "2008-01-02",
+      "max_date": "2008-12-31"
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2009.csv",
+      "sha256": "028ff77be42cd975412fa3b8130ec2360cb3a40c627880258009b97164fec259",
+      "bytes": 1097453,
+      "rows": 14386,
+      "min_date": "2009-01-02",
+      "max_date": "2009-12-31"
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2010.csv",
+      "sha256": "24eda5c215cf8a793d2c1888f0b4024b9029d329480b4ce065f25a281e96d6fb",
+      "bytes": 1163162,
+      "rows": 14952,
+      "min_date": "2010-01-04",
+      "max_date": "2010-12-31"
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2011.csv",
+      "sha256": "2b9eacbc4e3b14e63ba6b6279be26b3098043f7b6a1e450b4362760809beb109",
+      "bytes": 1152705,
+      "rows": 14931,
+      "min_date": "2011-01-03",
+      "max_date": "2011-12-30"
+    },
+    {
+      "path": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2012.csv",
+      "sha256": "adfc5d51412366c21b714c86001fe3293a870c586960410ed1030fe76321f945",
+      "bytes": 1234377,
+      "rows": 16044,
+      "min_date": "2012-01-03",
+      "max_date": "2012-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2013.csv",
+      "sha256": "e175714b0f051907d63ab1006e3868b678ca0552d1b4f103943fbced461839a4",
+      "bytes": 1236310,
+      "rows": 14889,
+      "min_date": "2013-01-02",
+      "max_date": "2013-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2014.csv",
+      "sha256": "bdddbace4cdb48ec360d40d4358175aaffa8c12f8199c002b602e71b3f069199",
+      "bytes": 1318123,
+      "rows": 15695,
+      "min_date": "2014-01-02",
+      "max_date": "2014-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2015.csv",
+      "sha256": "473678d04039a82307a249a0f0fa2e2ae18348ebf0e31b1ec20dfe9688313e61",
+      "bytes": 1374934,
+      "rows": 16386,
+      "min_date": "2015-01-02",
+      "max_date": "2015-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2016.csv",
+      "sha256": "2c759011268733d7a64d292fde0270b82225bb74998be258a0881851c2fbaa76",
+      "bytes": 1402051,
+      "rows": 16800,
+      "min_date": "2016-01-04",
+      "max_date": "2016-12-30"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2017.csv",
+      "sha256": "d5fb361e9d0171f93804098f345d2f5724a6ce6a294e8c17e1242303e84b68ab",
+      "bytes": 1413323,
+      "rows": 16981,
+      "min_date": "2015-05-09",
+      "max_date": "2017-12-29"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2018.csv",
+      "sha256": "8cba92afd0c3d5ee9f18ff5c7400e00fbf44b30c61114de75af748c8a16855c4",
+      "bytes": 1477930,
+      "rows": 17650,
+      "min_date": "2018-01-02",
+      "max_date": "2018-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2019.csv",
+      "sha256": "cad991a6aed128268f4b71d4000eec942206675431a02c25deca58a69ea51e2c",
+      "bytes": 1532614,
+      "rows": 18147,
+      "min_date": "2019-01-02",
+      "max_date": "2019-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2020.csv",
+      "sha256": "2e406381b22eabfd40a21b148a7dc643d988641a43c5fdb3b1c55cffd821b75f",
+      "bytes": 1481116,
+      "rows": 17892,
+      "min_date": "2020-01-02",
+      "max_date": "2020-12-31"
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_stock_market_sectors_2013.csv",
+      "sha256": "58f275b2172365fd431258ac280ab63703d9854efa912e072ac5da5b6026c20e",
+      "bytes": 2767,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    },
+    {
+      "path": "data/raw/nse/73rb78pmzw/NSE_data_stock_market_sectors_2020.csv",
+      "sha256": "b55cb89cb4525d22ee6f897b34844c88b650a234e67749956b3e2aad324be4ac",
+      "bytes": 3212,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    },
+    {
+      "path": "data/raw/nse/97hkwn5y3x/NSE_data_all_stocks_2021_upto_31dec2021.csv",
+      "sha256": "dff3bce9a0c915b5823f5b18d1b212c7ae2824f06971dd6721e2a9f77d4148ea",
+      "bytes": 1568005,
+      "rows": 17746,
+      "min_date": "2021-01-04",
+      "max_date": "2021-12-31"
+    },
+    {
+      "path": "data/raw/nse/97hkwn5y3x/NSE_data_stock_market_sectors_as_at_31dec2021.csv",
+      "sha256": "f688a3d8bc266ee6bb2a425a1a1ab3adfccf891318eb80a5fbddfc3509b9fa54",
+      "bytes": 3207,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    },
+    {
+      "path": "data/raw/nse/jmcdmnyh2s/NSE_data_all_stocks_2022.csv",
+      "sha256": "fb954b55fddf357192a1c0327cbbc2376b014cdee04504309b49a14fa64760be",
+      "bytes": 1406889,
+      "rows": 16806,
+      "min_date": "2022-01-03",
+      "max_date": "2022-12-30"
+    },
+    {
+      "path": "data/raw/nse/jmcdmnyh2s/NSE_data_stock_market_sectors_2022.csv",
+      "sha256": "fe9808149756d562ce0e241c2769d3ebd7fd0d7b609b2a0415d4ceb74bf6f1dc",
+      "bytes": 3250,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    },
+    {
+      "path": "data/raw/nse/ss5pfw8xnk/NSE_data_all_stocks_2023.csv",
+      "sha256": "133dc62c11b3266bc9cb9f7769c44af21969188529d573b7076dac544eac498b",
+      "bytes": 1492162,
+      "rows": 17274,
+      "min_date": "2023-01-03",
+      "max_date": "2023-12-29"
+    },
+    {
+      "path": "data/raw/nse/ss5pfw8xnk/NSE_data_all_stocks_2024.csv",
+      "sha256": "bb93cfa9998e46918f316996e232445166aca37fcf734e31276332669d83c2fb",
+      "bytes": 1578911,
+      "rows": 18119,
+      "min_date": "2024-01-02",
+      "max_date": "2024-12-31"
+    },
+    {
+      "path": "data/raw/nse/ss5pfw8xnk/NSE_data_stock_market_sectors_2023_2024.csv",
+      "sha256": "56296241c31e062e93514a9c52a41c40e9d71135ffadfcd63f482b4c25beab14",
+      "bytes": 3349,
+      "rows": 0,
+      "min_date": null,
+      "max_date": null
+    }
+  ],
+  "year_ranges": {
+    "2025": {
+      "min_date": "2025-01-02",
+      "max_date": "2025-12-31",
+      "rows": 18106,
+      "file": "data/raw/nse/2b63rx67xt/NSE_data_all_stocks_2025.csv"
+    },
+    "2007": {
+      "min_date": "2007-01-02",
+      "max_date": "2007-12-24",
+      "rows": 10608,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2007.csv"
+    },
+    "2008": {
+      "min_date": "2008-01-02",
+      "max_date": "2008-12-31",
+      "rows": 10583,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2008.csv"
+    },
+    "2009": {
+      "min_date": "2009-01-02",
+      "max_date": "2009-12-31",
+      "rows": 14386,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2009.csv"
+    },
+    "2010": {
+      "min_date": "2010-01-04",
+      "max_date": "2010-12-31",
+      "rows": 14952,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2010.csv"
+    },
+    "2011": {
+      "min_date": "2011-01-03",
+      "max_date": "2011-12-30",
+      "rows": 14931,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2011.csv"
+    },
+    "2012": {
+      "min_date": "2012-01-03",
+      "max_date": "2012-12-31",
+      "rows": 16044,
+      "file": "data/raw/nse/5hk4zw32f5/NSE_data_all_stocks_2012.csv"
+    },
+    "2013": {
+      "min_date": "2013-01-02",
+      "max_date": "2013-12-31",
+      "rows": 14889,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2013.csv"
+    },
+    "2014": {
+      "min_date": "2014-01-02",
+      "max_date": "2014-12-31",
+      "rows": 15695,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2014.csv"
+    },
+    "2015": {
+      "min_date": "2015-01-02",
+      "max_date": "2015-12-31",
+      "rows": 16386,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2015.csv"
+    },
+    "2016": {
+      "min_date": "2016-01-04",
+      "max_date": "2016-12-30",
+      "rows": 16800,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2016.csv"
+    },
+    "2017": {
+      "min_date": "2015-05-09",
+      "max_date": "2017-12-29",
+      "rows": 16981,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2017.csv"
+    },
+    "2018": {
+      "min_date": "2018-01-02",
+      "max_date": "2018-12-31",
+      "rows": 17650,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2018.csv"
+    },
+    "2019": {
+      "min_date": "2019-01-02",
+      "max_date": "2019-12-31",
+      "rows": 18147,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2019.csv"
+    },
+    "2020": {
+      "min_date": "2020-01-02",
+      "max_date": "2020-12-31",
+      "rows": 17892,
+      "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2020.csv"
+    },
+    "2021": {
+      "min_date": "2021-01-04",
+      "max_date": "2021-12-31",
+      "rows": 17746,
+      "file": "data/raw/nse/97hkwn5y3x/NSE_data_all_stocks_2021_upto_31dec2021.csv"
+    },
+    "2022": {
+      "min_date": "2022-01-03",
+      "max_date": "2022-12-30",
+      "rows": 16806,
+      "file": "data/raw/nse/jmcdmnyh2s/NSE_data_all_stocks_2022.csv"
+    },
+    "2023": {
+      "min_date": "2023-01-03",
+      "max_date": "2023-12-29",
+      "rows": 17274,
+      "file": "data/raw/nse/ss5pfw8xnk/NSE_data_all_stocks_2023.csv"
+    },
+    "2024": {
+      "min_date": "2024-01-02",
+      "max_date": "2024-12-31",
+      "rows": 18119,
+      "file": "data/raw/nse/ss5pfw8xnk/NSE_data_all_stocks_2024.csv"
+    }
+  },
+  "coverage_2020": {
+    "file": "data/raw/nse/73rb78pmzw/NSE_data_all_stocks_2020.csv",
+    "min_date": "2020-01-02",
+    "max_date": "2020-12-31",
+    "rows": 17892,
+    "h2_missing": false,
+    "note": "2020 appears to extend into H2; still spot-check trading-day continuity."
+  }
+}

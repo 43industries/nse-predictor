@@ -1,0 +1,225 @@
+{
+  "n_rows": 303767,
+  "n_tickers": 107,
+  "date_min": "2007-01-02",
+  "date_max": "2025-12-31",
+  "top_liquid": [
+    {
+      "stock_code": "SCOM",
+      "avg_volume": 10648634.298101122,
+      "median_volume": 6838100.0,
+      "zero_volume_days": 1,
+      "n_days": 4371,
+      "first": "2008-01-07",
+      "last": "2025-12-31",
+      "name": "Safaricom Plc"
+    },
+    {
+      "stock_code": "EQTY",
+      "avg_volume": 1934143.9995767195,
+      "median_volume": 949900.0,
+      "zero_volume_days": 0,
+      "n_days": 4725,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "Equity Group Holdings Plc"
+    },
+    {
+      "stock_code": "KCB",
+      "avg_volume": 1674154.1559458317,
+      "median_volume": 977150.0,
+      "zero_volume_days": 0,
+      "n_days": 4726,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "KCB Group Plc"
+    },
+    {
+      "stock_code": "KENO",
+      "avg_volume": 1012412.0607787274,
+      "median_volume": 112000.0,
+      "zero_volume_days": 239,
+      "n_days": 3159,
+      "first": "2007-01-02",
+      "last": "2019-10-11",
+      "name": "KenolKobil Ltd"
+    },
+    {
+      "stock_code": "COOP",
+      "avg_volume": 858861.7665250236,
+      "median_volume": 426400.0,
+      "zero_volume_days": 1,
+      "n_days": 4236,
+      "first": "2008-11-13",
+      "last": "2025-12-31",
+      "name": "Co-operative Bank of Kenya Ltd"
+    },
+    {
+      "stock_code": "ABSA",
+      "avg_volume": 696505.8996282528,
+      "median_volume": 225750.0,
+      "zero_volume_days": 2,
+      "n_days": 3228,
+      "first": "2013-01-02",
+      "last": "2025-12-31",
+      "name": "ABSA Bank Kenya Plc"
+    },
+    {
+      "stock_code": "MSC",
+      "avg_volume": 670731.2245387011,
+      "median_volume": 384700.0,
+      "zero_volume_days": 999,
+      "n_days": 4173,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "Mumias Sugar Company Ltd"
+    },
+    {
+      "stock_code": "KEGN",
+      "avg_volume": 661698.0008463818,
+      "median_volume": 268600.0,
+      "zero_volume_days": 1,
+      "n_days": 4726,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "Kenya Electricity Generating Company Plc"
+    },
+    {
+      "stock_code": "KNRE",
+      "avg_volume": 618385.454724841,
+      "median_volume": 114900.0,
+      "zero_volume_days": 2,
+      "n_days": 4561,
+      "first": "2007-01-10",
+      "last": "2025-12-31",
+      "name": "Kenya Re-Insurance Corporation Ltd"
+    },
+    {
+      "stock_code": "KPLC",
+      "avg_volume": 599409.8602583105,
+      "median_volume": 210900.0,
+      "zero_volume_days": 0,
+      "n_days": 4723,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "Kenya Power and Lighting Company Plc"
+    },
+    {
+      "stock_code": "BRIT",
+      "avg_volume": 443123.26511104865,
+      "median_volume": 82100.0,
+      "zero_volume_days": 1,
+      "n_days": 3557,
+      "first": "2011-01-11",
+      "last": "2025-12-31",
+      "name": "Britam Holdings Plc"
+    },
+    {
+      "stock_code": "CIC",
+      "avg_volume": 372177.15498691483,
+      "median_volume": 147742.0,
+      "zero_volume_days": 0,
+      "n_days": 3439,
+      "first": "2012-01-02",
+      "last": "2025-12-31",
+      "name": "CIC Insurance Group Ltd"
+    },
+    {
+      "stock_code": "BBK",
+      "avg_volume": 351625.1169004676,
+      "median_volume": 204700.0,
+      "zero_volume_days": 0,
+      "n_days": 1497,
+      "first": "2007-01-02",
+      "last": "2012-12-31",
+      "name": "Barclays Bank"
+    },
+    {
+      "stock_code": "ACCS",
+      "avg_volume": 318692.8263988522,
+      "median_volume": 121400.0,
+      "zero_volume_days": 1,
+      "n_days": 1394,
+      "first": "2007-01-08",
+      "last": "2012-12-31",
+      "name": "AccessKenya Group"
+    },
+    {
+      "stock_code": "LAPR",
+      "avg_volume": 299270.2189781022,
+      "median_volume": 0.0,
+      "zero_volume_days": 672,
+      "n_days": 685,
+      "first": "2023-03-22",
+      "last": "2025-12-31",
+      "name": "LAPTrust Imara Income-REIT"
+    },
+    {
+      "stock_code": "CMC",
+      "avg_volume": 281229.45891783567,
+      "median_volume": 81300.0,
+      "zero_volume_days": 322,
+      "n_days": 1497,
+      "first": "2007-01-02",
+      "last": "2012-12-31",
+      "name": "CMC Holdings"
+    },
+    {
+      "stock_code": "EABL",
+      "avg_volume": 232752.08086367484,
+      "median_volume": 101950.0,
+      "zero_volume_days": 9,
+      "n_days": 4724,
+      "first": "2007-01-02",
+      "last": "2025-12-31",
+      "name": "East African Breweries Ltd"
+    },
+    {
+      "stock_code": "HAFR",
+      "avg_volume": 230489.19741518577,
+      "median_volume": 91800.0,
+      "zero_volume_days": 6,
+      "n_days": 3095,
+      "first": "2013-07-15",
+      "last": "2025-12-31",
+      "name": "Home Afrika Ltd"
+    },
+    {
+      "stock_code": "CTUM",
+      "avg_volume": 223367.5027881041,
+      "median_volume": 64100.0,
+      "zero_volume_days": 1,
+      "n_days": 3228,
+      "first": "2013-01-02",
+      "last": "2025-12-31",
+      "name": "Centum Investment Company Plc"
+    },
+    {
+      "stock_code": "ICDC",
+      "avg_volume": 221905.9452237809,
+      "median_volume": 117500.0,
+      "zero_volume_days": 0,
+      "n_days": 1497,
+      "first": "2007-01-02",
+      "last": "2012-12-31",
+      "name": "Centum Investment"
+    }
+  ],
+  "proposed_universe": [
+    "SCOM",
+    "EQTY",
+    "KCB",
+    "KENO",
+    "COOP",
+    "ABSA",
+    "MSC",
+    "KEGN",
+    "KNRE",
+    "KPLC",
+    "BRIT",
+    "CIC",
+    "BBK",
+    "ACCS",
+    "LAPR"
+  ]
+}

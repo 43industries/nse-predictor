@@ -1,0 +1,3 @@
+﻿stock_code,date,headline,source,url,sentiment
+SCOM,2026-01-15,Test drop-folder headline for Safaricom,manual,,neutral
+EQTY,2026-01-14,Test Equity news row,manual,https://example.com/,positive

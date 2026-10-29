@@ -1,0 +1,14 @@
+stock_code,date,headline,source,url,sentiment
+SCOM,2026-01-15,Test drop-folder headline for Safaricom,manual,,neutral
+EQTY,2026-01-14,Test Equity news row,manual,https://example.com/,positive
+SCOM,2025-12-18,Safaricom reports steady mobile-money volumes in Q3 trading update,Business Daily,https://www.businessdailyafrica.com/,neutral
+EQTY,2025-12-10,Equity Group expands regional lending book; Kenya unit remains core,Business Daily,https://www.businessdailyafrica.com/,positive
+EABL,2025-12-08,EABL flags input-cost pressure while volumes hold in East Africa,Business Daily,https://www.businessdailyafrica.com/,negative
+KCB,2025-12-02,KCB Group updates market on capital and NPL trends,Business Daily,https://www.businessdailyafrica.com/,neutral
+COOP,2025-11-20,Co-operative Bank cites SME pipeline growth in investor briefing,Business Daily,https://www.businessdailyafrica.com/,positive
+SCOM,2025-11-05,Safaricom board announces interim dividend calendar for shareholders,NSE announcements (manual),https://www.nse.co.ke/,positive
+ABSA,2025-10-30,Absa Bank Kenya reports resilient retail franchise,Company results (manual),,positive
+EQTY,2025-10-22,Equity Group half-year results highlight deposit growth,Company results (manual),,positive
+KQ,2025-09-28,Kenya Airways restructuring and route network remain under watch,Business Daily,https://www.businessdailyafrica.com/,neutral
+SCOM,2025-09-12,Analysts watch M-Pesa competition and tariff outlook into year-end,The EastAfrican,https://www.theeastafrican.co.ke/,neutral
+KCB,2025-08-15,KCB shareholders approve ordinary business at AGM,NSE announcements (manual),https://www.nse.co.ke/,neutral
