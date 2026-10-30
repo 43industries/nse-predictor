@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -16,8 +17,14 @@ def build_error_history(
     pred = predictions[["trade_date", "stock_code", "prob_up", "pred_label"]].copy()
     out = base.merge(pred, on=["trade_date", "stock_code"], how="inner")
     out["y_dir_5d"] = out["y_dir_5d"].astype(float)
-    out["pred_up"] = (out["pred_label"].astype(str).str.lower() == "up").astype(int)
-    out["correct"] = (out["pred_up"] == out["y_dir_5d"].astype(int)).astype(bool)
+    label = out["pred_label"].astype(str).str.lower()
+    out["pred_up"] = (label == "up").astype(int)
+    # Flat abstentions excluded from hit-rate (correct = NA)
+    out["correct"] = np.where(
+        label == "flat",
+        pd.NA,
+        out["pred_up"] == out["y_dir_5d"].astype(int),
+    )
     out["horizon_days"] = horizon_days
     return out.sort_values(["stock_code", "trade_date"]).reset_index(drop=True)
 

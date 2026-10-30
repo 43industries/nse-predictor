@@ -1,0 +1,17 @@
+fundamentals.csv — point-in-time company fundamentals
+
+Copy fundamentals_template.csv → fundamentals.csv and fill rows.
+Add multiple rows per ticker (FY / H1) with real publish_date.
+
+Columns:
+  stock_code     NSE ticker
+  report_date    Period end (YYYY-MM-DD)
+  publish_date   When the print was knowable (preferred as-of)
+  eps            Earnings per share
+  dividend       DPS for the period
+  book_value     Book value per share
+  period         e.g. FY2023, H1-2024
+
+Leakage: models join on publish_date (fallback report_date) backward to trade_date.
+Features included only if coverage ≥ 30% of train rows.
+Do not invent EPS — leave blank until official filings are entered.

@@ -149,6 +149,9 @@ def collect_daily() -> dict:
             "last_run": datetime.now(timezone.utc).isoformat(),
             "rows_added": 0,
             "max_date": None,
+            "n_tickers": 0,
+            "missing_vs_universe": [],
+            "coverage_pct": None,
             "files_processed": [],
             "errors": [],
             "note": "No CSV files in data/raw/nse/incoming/",
@@ -165,6 +168,7 @@ def collect_daily() -> dict:
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{path.name}: {exc}")
 
+    batch = None
     if frames:
         batch = pd.concat(frames, ignore_index=True)
         batch = batch.drop_duplicates(subset=["trade_date", "stock_code"], keep="last")
@@ -177,10 +181,37 @@ def collect_daily() -> dict:
             dest = ARCHIVE / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_{name}"
             shutil.move(str(src), str(dest))
 
+    n_tickers = 0
+    missing_vs_universe: list[str] = []
+    coverage_pct = None
+    if batch is not None and not batch.empty:
+        from nse_predictor.universe import investable_equities
+
+        batch_codes = set(batch["stock_code"].astype(str).str.upper())
+        n_tickers = len(batch_codes)
+        uni_path = ROOT / "reports" / "universe_investable.json"
+        if uni_path.exists():
+            try:
+                uni = json.loads(uni_path.read_text(encoding="utf-8"))
+                investable = list(uni.get("investable") or [])
+                if not investable and uni.get("universe"):
+                    investable = investable_equities(uni["universe"])
+                missing_vs_universe = sorted(c for c in investable if c not in batch_codes)
+                if investable:
+                    coverage_pct = round(
+                        100.0 * (len(investable) - len(missing_vs_universe)) / len(investable),
+                        1,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"universe coverage: {exc}")
+
     status = {
         "last_run": datetime.now(timezone.utc).isoformat(),
         "rows_added": int(rows_added),
         "max_date": max_date,
+        "n_tickers": int(n_tickers),
+        "missing_vs_universe": missing_vs_universe,
+        "coverage_pct": coverage_pct,
         "files_processed": processed,
         "errors": errors,
         "note": None if processed else "No valid CSVs processed",

@@ -1,0 +1,399 @@
+{
+  "macro_source": "synthetic",
+  "fundamentals_status": "skipped low ticker overlap=22.2% < 30%",
+  "fundamentals_included": false,
+  "n_investable_rows": 44840,
+  "model_feature_cols": [
+    "ret_1d",
+    "ma5_ratio",
+    "ma20_ratio",
+    "ma50_ratio",
+    "vol_20",
+    "rsi_14",
+    "macd",
+    "macd_signal",
+    "dist_52w_high",
+    "dist_52w_low",
+    "nasi_ret",
+    "sector_ret",
+    "xs_ret_1d",
+    "xs_ret_5d",
+    "sector_xs",
+    "stock_vs_sector_1d",
+    "rsi_vs_nasi",
+    "ma20_xs",
+    "volume_chg",
+    "days_since_trade",
+    "adv_20",
+    "rel_volume",
+    "amihud_20",
+    "zero_vol_streak",
+    "jump_flag_1d",
+    "dow",
+    "month",
+    "results_season"
+  ],
+  "macro_excluded_from_model": [
+    "cbk_rate",
+    "cbk_chg",
+    "tbill_91d",
+    "usd_kes",
+    "usd_kes_chg",
+    "inflation_yoy",
+    "inflation_trend",
+    "lending_rate"
+  ],
+  "relative_coverage": {
+    "xs_ret_1d": 0.999821587867975,
+    "xs_ret_5d": 0.9985950044603032,
+    "sector_xs": 0.999821587867975,
+    "stock_vs_sector_1d": 1.0,
+    "rsi_vs_nasi": 0.9760258697591436,
+    "ma20_xs": 0.9943131132917038
+  },
+  "relative_coverage_ok": true,
+  "fundamentals_asof": {
+    "checked": 0,
+    "leaks": 0,
+    "ok": true
+  },
+  "per_feature": [
+    {
+      "feature": "ret_1d",
+      "group": "CORE_PRICE",
+      "definition": "1d price return",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.054176171676902744
+    },
+    {
+      "feature": "ma5_ratio",
+      "group": "CORE_PRICE",
+      "definition": "price/MA5 - 1",
+      "coverage": 0.9995762711864407,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.12736139330294932
+    },
+    {
+      "feature": "ma20_ratio",
+      "group": "CORE_PRICE",
+      "definition": "price/MA20 - 1",
+      "coverage": 0.9975691347011597,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.19839811537759544
+    },
+    {
+      "feature": "ma50_ratio",
+      "group": "CORE_PRICE",
+      "definition": "price/MA50 - 1",
+      "coverage": 0.9936663693131133,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.16926514312582816
+    },
+    {
+      "feature": "vol_20",
+      "group": "CORE_PRICE",
+      "definition": "20d std of ret_1d",
+      "coverage": 0.997457627118644,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.022492340375359753
+    },
+    {
+      "feature": "rsi_14",
+      "group": "CORE_PRICE",
+      "definition": "14d RSI",
+      "coverage": 0.9811106155218555,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.15341017135015608
+    },
+    {
+      "feature": "macd",
+      "group": "CORE_PRICE",
+      "definition": "MACD line",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.10810664006514897
+    },
+    {
+      "feature": "macd_signal",
+      "group": "CORE_PRICE",
+      "definition": "MACD signal",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.04341199139668274
+    },
+    {
+      "feature": "dist_52w_high",
+      "group": "CORE_PRICE",
+      "definition": "distance to 252d high",
+      "coverage": 0.2705842997323818,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.004548754208474931
+    },
+    {
+      "feature": "dist_52w_low",
+      "group": "CORE_PRICE",
+      "definition": "distance to 252d low",
+      "coverage": 0.2705842997323818,
+      "in_model": true,
+      "rank_ic_vs_xs": 0.0019727593212102612
+    },
+    {
+      "feature": "nasi_ret",
+      "group": "CORE_PRICE",
+      "definition": "1d NASI return (past)",
+      "coverage": 0.999821587867975,
+      "in_model": true,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "sector_ret",
+      "group": "CORE_PRICE",
+      "definition": "same-day sector mean ret_1d",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.027976407005029607
+    },
+    {
+      "feature": "xs_ret_1d",
+      "group": "RELATIVE",
+      "definition": "ret_1d - nasi_ret",
+      "coverage": 0.999821587867975,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.05404713234383307
+    },
+    {
+      "feature": "xs_ret_5d",
+      "group": "RELATIVE",
+      "definition": "trailing 5d stock - NASI return",
+      "coverage": 0.9985950044603032,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.14781085557944643
+    },
+    {
+      "feature": "sector_xs",
+      "group": "RELATIVE",
+      "definition": "sector_ret - nasi_ret",
+      "coverage": 0.999821587867975,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.027915742791512887
+    },
+    {
+      "feature": "stock_vs_sector_1d",
+      "group": "RELATIVE",
+      "definition": "ret_1d - sector_ret",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.048277037353005654
+    },
+    {
+      "feature": "rsi_vs_nasi",
+      "group": "RELATIVE",
+      "definition": "stock RSI14 - NASI RSI14",
+      "coverage": 0.9760258697591436,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.1514522190188411
+    },
+    {
+      "feature": "ma20_xs",
+      "group": "RELATIVE",
+      "definition": "stock ma20_ratio - NASI ma20_ratio",
+      "coverage": 0.9943131132917038,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.19626940707731788
+    },
+    {
+      "feature": "volume_chg",
+      "group": "LIQUIDITY",
+      "definition": "volume vs prior day",
+      "coverage": 0.27172167707404105,
+      "in_model": true,
+      "rank_ic_vs_xs": 0.038105082470680354
+    },
+    {
+      "feature": "days_since_trade",
+      "group": "LIQUIDITY",
+      "definition": "zero-volume streak",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": 0.014604871111654977
+    },
+    {
+      "feature": "adv_20",
+      "group": "LIQUIDITY",
+      "definition": "20d mean volume",
+      "coverage": 0.2715655664585192,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.016646287767544128
+    },
+    {
+      "feature": "rel_volume",
+      "group": "LIQUIDITY",
+      "definition": "volume / adv_20",
+      "coverage": 0.2715655664585192,
+      "in_model": true,
+      "rank_ic_vs_xs": 0.029468772865837444
+    },
+    {
+      "feature": "amihud_20",
+      "group": "LIQUIDITY",
+      "definition": "20d mean |ret|/volume",
+      "coverage": 0.9851248884924175,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.03317984849513349
+    },
+    {
+      "feature": "zero_vol_streak",
+      "group": "LIQUIDITY",
+      "definition": "alias of days_since_trade",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": 0.014604871111654977
+    },
+    {
+      "feature": "jump_flag_1d",
+      "group": "LIQUIDITY",
+      "definition": "1 if |ret_1d| > 40%",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": -0.18028956712704042
+    },
+    {
+      "feature": "dow",
+      "group": "CALENDAR",
+      "definition": "day of week",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "month",
+      "group": "CALENDAR",
+      "definition": "calendar month",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "results_season",
+      "group": "CALENDAR",
+      "definition": "Feb\u2013Mar / Aug\u2013Sep flag",
+      "coverage": 1.0,
+      "in_model": true,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "cbk_rate",
+      "group": "MACRO_OFFICIAL",
+      "definition": "CBR level (official only)",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "cbk_chg",
+      "group": "MACRO_OFFICIAL",
+      "definition": "CBR change",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "tbill_91d",
+      "group": "MACRO_OFFICIAL",
+      "definition": "91d T-bill",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "usd_kes",
+      "group": "MACRO_OFFICIAL",
+      "definition": "USD/KES level",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "usd_kes_chg",
+      "group": "MACRO_OFFICIAL",
+      "definition": "USD/KES pct change",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "inflation_yoy",
+      "group": "MACRO_OFFICIAL",
+      "definition": "CPI YoY",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "inflation_trend",
+      "group": "MACRO_OFFICIAL",
+      "definition": "inflation diff",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "lending_rate",
+      "group": "MACRO_OFFICIAL",
+      "definition": "lending rate",
+      "coverage": 1.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "eps",
+      "group": "FUNDAMENTALS",
+      "definition": "as-of EPS",
+      "coverage": 0.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "eps_yoy",
+      "group": "FUNDAMENTALS",
+      "definition": "EPS YoY change",
+      "coverage": 0.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "div_yield_proxy",
+      "group": "FUNDAMENTALS",
+      "definition": "dividend / price",
+      "coverage": 0.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "book_value",
+      "group": "FUNDAMENTALS",
+      "definition": "book value / share",
+      "coverage": 0.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    },
+    {
+      "feature": "book_to_price",
+      "group": "FUNDAMENTALS",
+      "definition": "book_value / price",
+      "coverage": 0.0,
+      "in_model": false,
+      "rank_ic_vs_xs": null
+    }
+  ],
+  "cache": {
+    "cache_hit": true,
+    "inputs_hash": "8fa4a8978ccd0fb0",
+    "path": "data\\processed\\features_v2.parquet",
+    "macro_source": "synthetic",
+    "cache_version": "features_v2",
+    "fundamentals_status": "skipped low ticker overlap=22.2% < 30%",
+    "fundamentals_included": false
+  }
+}

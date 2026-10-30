@@ -1,0 +1,24 @@
+{
+  "n_mapped_total": 82,
+  "investable": [
+    "SCOM",
+    "EQTY",
+    "KCB",
+    "COOP",
+    "ABSA",
+    "KEGN",
+    "KNRE",
+    "KPLC",
+    "BRIT",
+    "CIC",
+    "EABL",
+    "CTUM",
+    "KQ",
+    "NCBA",
+    "HFCK"
+  ],
+  "coverage": 1.0,
+  "orphans": [],
+  "path": "data\\processed\\sectors.parquet",
+  "ok": true
+}

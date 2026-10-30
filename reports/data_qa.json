@@ -1,0 +1,729 @@
+{
+  "investable": [
+    "SCOM",
+    "EQTY",
+    "KCB",
+    "COOP",
+    "ABSA",
+    "KEGN",
+    "KNRE",
+    "KPLC",
+    "BRIT",
+    "CIC",
+    "EABL",
+    "CTUM",
+    "KQ",
+    "NCBA",
+    "HFCK"
+  ],
+  "prices": {
+    "n_rows": 303770,
+    "min_date": "2007-01-02",
+    "max_date": "2026-01-01",
+    "n_tickers": 107
+  },
+  "duplicates": {
+    "duplicate_rows": 0,
+    "ok": true
+  },
+  "calendar_gaps": {
+    "n_gap_events": 25,
+    "examples": [
+      {
+        "stock_code": "BRIT",
+        "from": "2011-01-12",
+        "to": "2011-02-11",
+        "calendar_days": 30,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-02-12",
+        "to": "2011-03-10",
+        "calendar_days": 26,
+        "market_days_skipped": 15
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-03-11",
+        "to": "2011-04-10",
+        "calendar_days": 30,
+        "market_days_skipped": 19
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-04-11",
+        "to": "2011-05-10",
+        "calendar_days": 29,
+        "market_days_skipped": 14
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-05-12",
+        "to": "2011-06-10",
+        "calendar_days": 29,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-06-12",
+        "to": "2011-07-10",
+        "calendar_days": 28,
+        "market_days_skipped": 18
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-07-12",
+        "to": "2011-08-09",
+        "calendar_days": 28,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "BRIT",
+        "from": "2011-08-12",
+        "to": "2011-09-09",
+        "calendar_days": 28,
+        "market_days_skipped": 16
+      },
+      {
+        "stock_code": "CIC",
+        "from": "2012-06-12",
+        "to": "2012-07-02",
+        "calendar_days": 20,
+        "market_days_skipped": 13
+      },
+      {
+        "stock_code": "COOP",
+        "from": "2008-11-13",
+        "to": "2008-12-22",
+        "calendar_days": 39,
+        "market_days_skipped": 22
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-01-11",
+        "to": "2007-02-10",
+        "calendar_days": 30,
+        "market_days_skipped": 18
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-02-11",
+        "to": "2007-03-09",
+        "calendar_days": 26,
+        "market_days_skipped": 16
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-03-12",
+        "to": "2007-04-09",
+        "calendar_days": 28,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-04-12",
+        "to": "2007-05-09",
+        "calendar_days": 27,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-05-12",
+        "to": "2007-06-09",
+        "calendar_days": 28,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-06-12",
+        "to": "2007-07-09",
+        "calendar_days": 27,
+        "market_days_skipped": 17
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-07-17",
+        "to": "2007-08-10",
+        "calendar_days": 24,
+        "market_days_skipped": 15
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-08-11",
+        "to": "2007-08-27",
+        "calendar_days": 16,
+        "market_days_skipped": 10
+      },
+      {
+        "stock_code": "KNRE",
+        "from": "2007-09-28",
+        "to": "2007-10-09",
+        "calendar_days": 11,
+        "market_days_skipped": 4
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-01-12",
+        "to": "2008-02-07",
+        "calendar_days": 26,
+        "market_days_skipped": 16
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-02-12",
+        "to": "2008-03-07",
+        "calendar_days": 24,
+        "market_days_skipped": 16
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-03-12",
+        "to": "2008-04-07",
+        "calendar_days": 26,
+        "market_days_skipped": 15
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-04-12",
+        "to": "2008-04-23",
+        "calendar_days": 11,
+        "market_days_skipped": 7
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-04-23",
+        "to": "2008-05-08",
+        "calendar_days": 15,
+        "market_days_skipped": 8
+      },
+      {
+        "stock_code": "SCOM",
+        "from": "2008-05-12",
+        "to": "2008-06-08",
+        "calendar_days": 27,
+        "market_days_skipped": 18
+      }
+    ],
+    "ok": true
+  },
+  "zero_volume": {
+    "per_stock": [
+      {
+        "stock_code": "ABSA",
+        "zero_volume_frac": 0.0006195786864931846,
+        "max_days_since_trade": 2
+      },
+      {
+        "stock_code": "BRIT",
+        "zero_volume_frac": 0.000281135788585887,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "CIC",
+        "zero_volume_frac": 0.0,
+        "max_days_since_trade": 0
+      },
+      {
+        "stock_code": "COOP",
+        "zero_volume_frac": 0.00023607176581680832,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "CTUM",
+        "zero_volume_frac": 0.0003097893432465923,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "EABL",
+        "zero_volume_frac": 0.001905165114309907,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "EQTY",
+        "zero_volume_frac": 0.0,
+        "max_days_since_trade": 0
+      },
+      {
+        "stock_code": "HFCK",
+        "zero_volume_frac": 0.0021159542953872196,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "KCB",
+        "zero_volume_frac": 0.0,
+        "max_days_since_trade": 0
+      },
+      {
+        "stock_code": "KEGN",
+        "zero_volume_frac": 0.00021159542953872197,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "KNRE",
+        "zero_volume_frac": 0.0004385003288752467,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "KPLC",
+        "zero_volume_frac": 0.0,
+        "max_days_since_trade": 0
+      },
+      {
+        "stock_code": "KQ",
+        "zero_volume_frac": 0.2383068783068783,
+        "max_days_since_trade": 1117
+      },
+      {
+        "stock_code": "NCBA",
+        "zero_volume_frac": 0.0015489467162329617,
+        "max_days_since_trade": 1
+      },
+      {
+        "stock_code": "SCOM",
+        "zero_volume_frac": 0.00022872827081427266,
+        "max_days_since_trade": 1
+      }
+    ],
+    "flagged": [
+      {
+        "stock_code": "KQ",
+        "zero_volume_frac": 0.2383068783068783,
+        "max_days_since_trade": 1117
+      }
+    ],
+    "ok": false
+  },
+  "jumps": {
+    "n_jumps": 388,
+    "threshold": 0.4,
+    "examples": [
+      {
+        "trade_date": "2009-05-01",
+        "stock_code": "EQTY",
+        "ret_1d": 11.841328413284133,
+        "price": 174.0,
+        "volume": 68600.0
+      },
+      {
+        "trade_date": "2009-01-13",
+        "stock_code": "EQTY",
+        "ret_1d": 11.51908396946565,
+        "price": 164.0,
+        "volume": 76000.0
+      },
+      {
+        "trade_date": "2009-12-01",
+        "stock_code": "EQTY",
+        "ret_1d": 11.267657992565056,
+        "price": 165.0,
+        "volume": 108300.0
+      },
+      {
+        "trade_date": "2009-06-01",
+        "stock_code": "EQTY",
+        "ret_1d": 11.086330935251798,
+        "price": 168.0,
+        "volume": 89900.0
+      },
+      {
+        "trade_date": "2009-09-01",
+        "stock_code": "EQTY",
+        "ret_1d": 10.846689895470384,
+        "price": 170.0,
+        "volume": 32800.0
+      },
+      {
+        "trade_date": "2009-02-13",
+        "stock_code": "EQTY",
+        "ret_1d": 10.515151515151516,
+        "price": 152.0,
+        "volume": 228300.0
+      },
+      {
+        "trade_date": "2007-05-01",
+        "stock_code": "KCB",
+        "ret_1d": 9.653465346534654,
+        "price": 269.0,
+        "volume": 328500.0
+      },
+      {
+        "trade_date": "2010-09-13",
+        "stock_code": "KPLC",
+        "ret_1d": 9.521739130434783,
+        "price": 242.0,
+        "volume": 80300.0
+      },
+      {
+        "trade_date": "2007-01-15",
+        "stock_code": "KCB",
+        "ret_1d": 9.470588235294118,
+        "price": 267.0,
+        "volume": 264600.0
+      },
+      {
+        "trade_date": "2007-02-13",
+        "stock_code": "KCB",
+        "ret_1d": 9.415841584158416,
+        "price": 263.0,
+        "volume": 221300.0
+      },
+      {
+        "trade_date": "2009-10-02",
+        "stock_code": "EQTY",
+        "ret_1d": 9.394265232974911,
+        "price": 145.0,
+        "volume": 21500.0
+      },
+      {
+        "trade_date": "2010-10-13",
+        "stock_code": "KPLC",
+        "ret_1d": 9.197802197802197,
+        "price": 232.0,
+        "volume": 42700.0
+      },
+      {
+        "trade_date": "2007-10-01",
+        "stock_code": "KCB",
+        "ret_1d": 9.196078431372548,
+        "price": 260.0,
+        "volume": 159200.0
+      },
+      {
+        "trade_date": "2007-11-01",
+        "stock_code": "KCB",
+        "ret_1d": 9.196078431372548,
+        "price": 260.0,
+        "volume": 105900.0
+      },
+      {
+        "trade_date": "2009-07-01",
+        "stock_code": "EQTY",
+        "ret_1d": 9.0,
+        "price": 162.0,
+        "volume": 84400.0
+      },
+      {
+        "trade_date": "2009-11-02",
+        "stock_code": "EQTY",
+        "ret_1d": 8.93006993006993,
+        "price": 142.0,
+        "volume": 25700.0
+      },
+      {
+        "trade_date": "2007-09-01",
+        "stock_code": "KCB",
+        "ret_1d": 8.925925925925926,
+        "price": 268.0,
+        "volume": 380300.0
+      },
+      {
+        "trade_date": "2007-12-01",
+        "stock_code": "KCB",
+        "ret_1d": 8.871559633027523,
+        "price": 269.0,
+        "volume": 431800.0
+      },
+      {
+        "trade_date": "2009-08-01",
+        "stock_code": "EQTY",
+        "ret_1d": 8.85250737463127,
+        "price": 167.0,
+        "volume": 75200.0
+      },
+      {
+        "trade_date": "2007-07-02",
+        "stock_code": "KCB",
+        "ret_1d": 8.787234042553191,
+        "price": 230.0,
+        "volume": 358000.0
+      },
+      {
+        "trade_date": "2007-06-02",
+        "stock_code": "KCB",
+        "ret_1d": 8.659574468085106,
+        "price": 227.0,
+        "volume": 125200.0
+      },
+      {
+        "trade_date": "2007-08-01",
+        "stock_code": "KCB",
+        "ret_1d": 8.557522123893806,
+        "price": 270.0,
+        "volume": 292100.0
+      },
+      {
+        "trade_date": "2009-03-13",
+        "stock_code": "EQTY",
+        "ret_1d": 8.077490774907748,
+        "price": 123.0,
+        "volume": 67900.0
+      },
+      {
+        "trade_date": "2010-08-13",
+        "stock_code": "KPLC",
+        "ret_1d": 7.967032967032967,
+        "price": 204.0,
+        "volume": 13300.0
+      },
+      {
+        "trade_date": "2010-07-13",
+        "stock_code": "KPLC",
+        "ret_1d": 7.747252747252746,
+        "price": 199.0,
+        "volume": 219900.0
+      },
+      {
+        "trade_date": "2010-06-14",
+        "stock_code": "KPLC",
+        "ret_1d": 7.6521739130434785,
+        "price": 199.0,
+        "volume": 28200.0
+      },
+      {
+        "trade_date": "2007-03-13",
+        "stock_code": "KCB",
+        "ret_1d": 7.073394495412844,
+        "price": 220.0,
+        "volume": 225500.0
+      },
+      {
+        "trade_date": "2010-03-15",
+        "stock_code": "KPLC",
+        "ret_1d": 6.621052631578947,
+        "price": 181.0,
+        "volume": 11100.0
+      },
+      {
+        "trade_date": "2010-12-01",
+        "stock_code": "KPLC",
+        "ret_1d": 5.488888888888889,
+        "price": 146.0,
+        "volume": 94000.0
+      },
+      {
+        "trade_date": "2010-01-13",
+        "stock_code": "KPLC",
+        "ret_1d": 5.32258064516129,
+        "price": 147.0,
+        "volume": 2000.0
+      },
+      {
+        "trade_date": "2010-02-15",
+        "stock_code": "KPLC",
+        "ret_1d": 5.22680412371134,
+        "price": 151.0,
+        "volume": 2000.0
+      },
+      {
+        "trade_date": "2009-04-03",
+        "stock_code": "EQTY",
+        "ret_1d": 4.459770114942529,
+        "price": 95.0,
+        "volume": 134500.0
+      },
+      {
+        "trade_date": "2015-05-11",
+        "stock_code": "HFCK",
+        "ret_1d": 2.297546012269939,
+        "price": 32.25,
+        "volume": 30800.0
+      },
+      {
+        "trade_date": "2008-02-13",
+        "stock_code": "HFCK",
+        "ret_1d": 2.078291814946619,
+        "price": 43.25,
+        "volume": 146200.0
+      },
+      {
+        "trade_date": "2015-05-11",
+        "stock_code": "CIC",
+        "ret_1d": 1.9365079365079367,
+        "price": 9.25,
+        "volume": 375600.0
+      },
+      {
+        "trade_date": "2008-03-13",
+        "stock_code": "HFCK",
+        "ret_1d": 1.8571428571428572,
+        "price": 40.0,
+        "volume": 118900.0
+      },
+      {
+        "trade_date": "2008-01-14",
+        "stock_code": "HFCK",
+        "ret_1d": 1.7906976744186047,
+        "price": 42.0,
+        "volume": 384400.0
+      },
+      {
+        "trade_date": "2008-04-14",
+        "stock_code": "HFCK",
+        "ret_1d": 1.7719298245614037,
+        "price": 39.5,
+        "volume": 42100.0
+      },
+      {
+        "trade_date": "2008-12-02",
+        "stock_code": "HFCK",
+        "ret_1d": 1.6442307692307692,
+        "price": 41.25,
+        "volume": 77100.0
+      },
+      {
+        "trade_date": "2008-11-01",
+        "stock_code": "HFCK",
+        "ret_1d": 1.621212121212121,
+        "price": 43.25,
+        "volume": 200100.0
+      },
+      {
+        "trade_date": "2015-05-11",
+        "stock_code": "KPLC",
+        "ret_1d": 1.5801526717557248,
+        "price": 16.9,
+        "volume": 98000.0
+      },
+      {
+        "trade_date": "2015-05-11",
+        "stock_code": "BRIT",
+        "ret_1d": 1.4500000000000002,
+        "price": 24.5,
+        "volume": 228600.0
+      },
+      {
+        "trade_date": "2011-01-13",
+        "stock_code": "KQ",
+        "ret_1d": 1.385204081632653,
+        "price": 46.75,
+        "volume": 89800.0
+      },
+      {
+        "trade_date": "2011-12-01",
+        "stock_code": "KQ",
+        "ret_1d": 1.3375,
+        "price": 46.75,
+        "volume": 30900.0
+      },
+      {
+        "trade_date": "2008-03-13",
+        "stock_code": "KQ",
+        "ret_1d": 1.3265306122448979,
+        "price": 57.0,
+        "volume": 349400.0
+      },
+      {
+        "trade_date": "2008-05-13",
+        "stock_code": "HFCK",
+        "ret_1d": 1.3208191126279862,
+        "price": 34.0,
+        "volume": 129500.0
+      },
+      {
+        "trade_date": "2008-04-14",
+        "stock_code": "KQ",
+        "ret_1d": 1.25,
+        "price": 54.0,
+        "volume": 170300.0
+      },
+      {
+        "trade_date": "2008-01-14",
+        "stock_code": "KQ",
+        "ret_1d": 1.2452830188679247,
+        "price": 59.5,
+        "volume": 54900.0
+      },
+      {
+        "trade_date": "2008-11-01",
+        "stock_code": "KQ",
+        "ret_1d": 1.2429906542056073,
+        "price": 60.0,
+        "volume": 108200.0
+      },
+      {
+        "trade_date": "2011-02-14",
+        "stock_code": "KQ",
+        "ret_1d": 1.2005208333333335,
+        "price": 42.25,
+        "volume": 468100.0
+      }
+    ],
+    "adj_vs_close_disagreements": 9945,
+    "ok": false
+  },
+  "ticker_hygiene": {
+    "n_rights": 10,
+    "rights_sample": [
+      "CFC-R",
+      "DTK-R",
+      "HFCK-R",
+      "KCB-R",
+      "KPLC-R",
+      "KQ-R",
+      "NIC-R",
+      "OCH-R",
+      "SCBK-R",
+      "TPSE-R"
+    ],
+    "n_indices": 10,
+    "indices": [
+      "^FNK15",
+      "^FNK25",
+      "^N10I",
+      "^N20I",
+      "^N25I",
+      "^NASI",
+      "^NBDI",
+      "^NBSI",
+      "^ZKEQTK",
+      "^ZKEQTU"
+    ],
+    "known_remaps": [
+      {
+        "from": "BBK",
+        "to": "ABSA",
+        "note": "Barclays Kenya rebranded to Absa",
+        "from_present": true,
+        "to_present": true
+      },
+      {
+        "from": "CFC",
+        "to": "CFCI",
+        "note": "Historical ticker variants \u2014 verify before merge",
+        "from_present": true,
+        "to_present": true
+      },
+      {
+        "from": "SAF",
+        "to": "SCOM",
+        "note": "Safaricom sometimes coded SAF in older lists",
+        "from_present": false,
+        "to_present": true
+      }
+    ],
+    "ok": true
+  },
+  "macro": {
+    "ok": true,
+    "source": "synthetic",
+    "n_rows": 228,
+    "min_date": "2007-01-01",
+    "max_date": "2025-12-01",
+    "monotonic": true,
+    "future_stub_rows": 0,
+    "banner": "SYNTHETIC MACRO \u2014 not official CBK/KNBS"
+  },
+  "macro_asof": {
+    "ok": true,
+    "checked": 500,
+    "leaks": 0
+  },
+  "sectors": {
+    "ok": true,
+    "coverage": 1.0,
+    "n_mapped": 15,
+    "orphans": []
+  },
+  "ok": true
+}

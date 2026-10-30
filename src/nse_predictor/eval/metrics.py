@@ -56,3 +56,86 @@ def compare_to_always_up(metrics: dict) -> dict:
         "beats_always_up": metrics["accuracy"] > always_up_acc,
         "lift_vs_always_up": metrics["accuracy"] - always_up_acc,
     }
+
+
+def majority_baseline_pred(y_true: np.ndarray) -> np.ndarray:
+    """Predict the majority class for every row."""
+    y_true = np.asarray(y_true).astype(int)
+    if len(y_true) == 0:
+        return y_true
+    maj = 1 if float(y_true.mean()) >= 0.5 else 0
+    return np.full(len(y_true), maj, dtype=int)
+
+
+def abstain_rate(pred_label: np.ndarray | pd.Series) -> float:
+    """Fraction of predictions labeled flat."""
+    s = pd.Series(pred_label).astype(str).str.lower()
+    if len(s) == 0:
+        return float("nan")
+    return float((s == "flat").mean())
+
+
+def brier_score(y_true: np.ndarray, y_prob: np.ndarray) -> float:
+    y_true = np.asarray(y_true, dtype=float)
+    y_prob = np.asarray(y_prob, dtype=float)
+    if len(y_true) == 0:
+        return float("nan")
+    return float(np.mean((y_prob - y_true) ** 2))
+
+
+def expected_calibration_error(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    n_bins: int = 10,
+) -> float:
+    """ECE over equal-width probability bins (same grid as calibration_table)."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_prob = np.asarray(y_prob, dtype=float)
+    if len(y_true) == 0:
+        return float("nan")
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    n = len(y_true)
+    for i in range(n_bins):
+        lo, hi = edges[i], edges[i + 1]
+        if i == n_bins - 1:
+            mask = (y_prob >= lo) & (y_prob <= hi)
+        else:
+            mask = (y_prob >= lo) & (y_prob < hi)
+        k = int(mask.sum())
+        if k == 0:
+            continue
+        ece += (k / n) * abs(float(y_true[mask].mean()) - float(y_prob[mask].mean()))
+    return float(ece)
+
+
+def rank_ic(
+    panel: pd.DataFrame,
+    pred_col: str,
+    target_col: str = "y_ret_5d_xs",
+    date_col: str = "trade_date",
+    min_names: int = 5,
+) -> dict:
+    """Mean daily Spearman rank correlation between prediction and target."""
+    if panel.empty or pred_col not in panel.columns or target_col not in panel.columns:
+        return {"mean_ic": float("nan"), "n_days": 0, "median_ic": float("nan")}
+    d = panel[[date_col, pred_col, target_col]].dropna().copy()
+    d[date_col] = pd.to_datetime(d[date_col])
+    ics: list[float] = []
+    for _, g in d.groupby(date_col):
+        if len(g) < min_names:
+            continue
+        if g[pred_col].nunique() < 2 or g[target_col].nunique() < 2:
+            continue
+        ic = g[pred_col].corr(g[target_col], method="spearman")
+        if pd.notna(ic):
+            ics.append(float(ic))
+    if not ics:
+        return {"mean_ic": float("nan"), "n_days": 0, "median_ic": float("nan")}
+    arr = np.asarray(ics, dtype=float)
+    return {
+        "mean_ic": float(np.mean(arr)),
+        "median_ic": float(np.median(arr)),
+        "n_days": int(len(arr)),
+        "ic_std": float(np.std(arr)),
+    }

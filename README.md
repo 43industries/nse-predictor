@@ -37,7 +37,10 @@ python scripts/build_macro_template.py
 
 python scripts/run_ingest.py
 python scripts/train_evaluate.py
-# writes data/processed/latest_forecasts.parquet and error_history.parquet
+# Train → calibrate + tune threshold / return quantiles on valid → refit train+valid → test once
+# Writes: models/artifacts/*.joblib, reports/evaluation_results.json,
+# reports/train_val_report.md, reports/per_stock_direction.csv,
+# data/processed/latest_forecasts.parquet + error_history.parquet
 # (train once; daily refresh uses score_latest only)
 
 # API
@@ -58,19 +61,28 @@ Licensing-safe path: export a daily OHLCV CSV from your licensed feed (or manual
 
 Expected columns (Wanjawa-compatible): `Date`, `Code`, `Name`, `12m Low`, `12m High`, `Day Low`, `Day High`, `Day Price`, `Previous`, `Change`, `Change%`, `Volume`, `Adjusted Price`.
 
-Then run:
+### Checklist: daily CSV drop → run_daily
+
+1. Export a **full-board** session CSV (not a 3-row sample).
+2. Drop it into `data/raw/nse/incoming/`.
+3. Run `python scripts/run_daily.py` (= collect → ingest → **QA** → score_latest).
+4. Confirm `data/processed/collection_status.json` shows `max_date`, `n_tickers`, and `coverage_pct` ≥ 80 vs investable.
+5. Confirm `reports/data_qa.md` and that `latest_forecasts` as-of matches the collected date for most investable names.
+6. Optional retrain after material history updates: `python scripts/train_evaluate.py`.
 
 ```bash
 python scripts/run_daily.py
-# = collect_daily → run_ingest → score_latest
+# = collect_daily → run_ingest → run_data_qa → score_latest → run_monitor
 ```
 
 Or step-by-step:
 
 ```bash
 python scripts/collect_daily.py   # appends to data/raw/nse/daily/, archives incoming files
-python scripts/run_ingest.py
+python scripts/run_ingest.py      # also prints non-fatal data QA summary
+python scripts/run_data_qa.py     # reports/data_qa.json + .md
 python scripts/score_latest.py    # refreshes forecasts with saved .joblib models (no retrain)
+python scripts/run_monitor.py     # pipeline / score hygiene / lagged outcomes / gate watch
 ```
 
 **Windows Task Scheduler** (weekdays ~17:30 EAT):
@@ -79,7 +91,33 @@ python scripts/score_latest.py    # refreshes forecasts with saved .joblib model
 - Arguments: `scripts\run_daily.py`
 - Start in: `C:\Users\...\nse predictor`
 
-Status file: `data/processed/collection_status.json` (also shown on the dashboard top bar).
+Status files (also shown on the dashboard top bar / Model health):
+
+| File | Role |
+| --- | --- |
+| `data/processed/collection_status.json` | Last collector run |
+| `data/processed/daily_run.json` | Last daily pipeline summary |
+| `data/processed/monitor_status.json` | Latest monitor check + alerts |
+| `data/processed/monitor_history.parquet` | Append-only monitor history |
+| `data/processed/forecast_log.parquet` | Scored forecast snapshots for lagged outcomes |
+
+`run_monitor.py` always exits 0 (Task Scheduler friendly). Grep stderr for `MONITOR_STATUS=fail` / `warn`.
+
+## Company logos
+
+Dashboard cards and stock detail show logos when available:
+
+1. **Local files (preferred):** `data/external/logos/{TICKER}.png` — seed with:
+
+```bash
+python scripts/fetch_logos.py
+```
+
+   Or drop your own licensed brand assets with those filenames.
+2. **Domain map:** `data/external/logos/companies.csv` — used by the fetcher / remote fallback
+3. **Fallback:** two-letter monogram if the image is missing or fails to load
+
+Use only logos you have rights to display. Cached/local files are embedded as data URIs in the UI.
 
 ## Stock news (drop-folder)
 
@@ -128,7 +166,9 @@ See [docs/data_dictionary.md](docs/data_dictionary.md). After download, check `d
 
 ## Modelling ladder
 
-Baselines → ARIMA/GARCH → LightGBM/XGBoost → optional LSTM. Keep complexity only if it beats baselines on walk-forward tests. SHAP explains tree drivers on the dashboard.
+**ML problem:** 5-day **excess return vs NASI** direction with a **±1% dead zone** (flat excess moves excluded from labels). Return intervals still target raw 5d return. Investable universe is liquidity-/price-screened (`reports/universe_investable.json`).
+
+Baselines → ARIMA/GARCH → LightGBM. Keep complexity only if it beats MA / majority baselines on walk-forward and shows positive Rank IC. SHAP explains tree drivers on the dashboard.
 
 ## Repo layout
 

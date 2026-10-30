@@ -1,0 +1,82 @@
+{
+  "protocol": {
+    "train_end": "2019-12-31",
+    "valid_end": "2022-12-31",
+    "horizon_days": 5,
+    "embargo": true,
+    "n_train_raw": 29058,
+    "n_train_fit": 29032,
+    "n_valid_raw": 7301,
+    "n_valid_fit": 7241,
+    "n_test_raw": 8462,
+    "n_test_eval": 8437
+  },
+  "calibration": {
+    "brier": 0.2527558188220143,
+    "ece": 0.07541197492288695,
+    "mean_prob_up": 0.4954183467241511,
+    "std_prob_up": 0.138403836221558,
+    "n_unique_probs": 39,
+    "n": 6343,
+    "abstain_rate": 0.24819248548062106,
+    "n_flat": 2094
+  },
+  "walk_forward_summary": {
+    "wf_mean_rank_ic": 0.12039232285388819,
+    "wf_folds_ic_positive": 8,
+    "wf_folds_beat_always_up": 7,
+    "n_folds": 8
+  },
+  "stress_rank_ic": {
+    "covid_2020": {
+      "mean_ic": 0.12870598528836788,
+      "median_ic": 0.12967032967032965,
+      "n_days": 211,
+      "ic_std": 0.320988374766932,
+      "abstain_rate": 0.29200652528548127
+    },
+    "fx_2023": {
+      "mean_ic": 0.023004181535341235,
+      "median_ic": 0.03922851696456023,
+      "n_days": 242,
+      "ic_std": 0.3002055481252739,
+      "abstain_rate": 0.24737945492662475
+    }
+  },
+  "stress_fragile": false,
+  "validation_gates": {
+    "status": "warn",
+    "reasons": [
+      "flagged_frac=53% \u2265 40%",
+      "macro_source=synthetic"
+    ],
+    "flags": [
+      "per_stock_flags",
+      "synthetic_macro"
+    ],
+    "test_rank_ic": 0.1331864083912613,
+    "wf_mean_rank_ic": 0.12039232285388819,
+    "stress_fragile": false,
+    "flagged_frac": 0.5333333333333333,
+    "return_coverage": 0.7420884200545218,
+    "macro_source": "synthetic"
+  },
+  "research_backtest": {
+    "ok": true,
+    "disclaimer": "research_only_not_for_selection",
+    "n_names": 15,
+    "total_return": 0.15450045492052733,
+    "buy_hold_return": 1.368396884511411,
+    "max_drawdown": -0.22007590255586063,
+    "n_trades": 2597,
+    "cost_bps": 50.0,
+    "mean_name_total_return": 0.136035593329155
+  },
+  "rank_ic": {
+    "mean_ic": 0.1331864083912613,
+    "median_ic": 0.14311093780479572,
+    "n_days": 730,
+    "ic_std": 0.3258068795481017
+  },
+  "abstain_rate": 0.24819248548062106
+}

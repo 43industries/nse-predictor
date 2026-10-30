@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Build data/external/macro_cbk.csv from public approximate CBK anchors.
+"""Write empty official macro template OR approximate anchors.
 
-Replace with official CBK / KNBS downloads for production research.
-Values are as-of published style (monthly), suitable for merge_asof joins.
+Usage:
+  python scripts/build_macro_template.py              # empty official template + column docs
+  python scripts/build_macro_template.py --approx      # approximate public anchors (synthetic)
+
+Fill the empty template from CBK / KNBS, then create marker file:
+  data/external/macro_cbk.csv.official
+so ingest records macro_source=official.
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +20,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "data" / "external" / "macro_cbk.csv"
+DOCS = ROOT / "data" / "external" / "macro_cbk.README.txt"
 
 # Approximate public anchors (CBR %, USD/KES, inflation YoY). Interpolated monthly.
 CBR_POINTS = [
@@ -60,7 +67,45 @@ def _series(points: list[tuple[str, float]], index: pd.DatetimeIndex) -> pd.Seri
     return s.reindex(index).ffill().bfill()
 
 
-def main() -> int:
+def write_empty_template() -> None:
+    cols = [
+        "observe_date",
+        "cbk_rate",
+        "tbill_91d",
+        "usd_kes",
+        "inflation_yoy",
+        "lending_rate",
+    ]
+    pd.DataFrame(columns=cols).to_csv(OUT, index=False)
+    DOCS.write_text(
+        "\n".join(
+            [
+                "macro_cbk.csv — official CBK / KNBS drop-in template",
+                "",
+                "Columns:",
+                "  observe_date   ISO date when the print was observable (YYYY-MM-DD)",
+                "  cbk_rate       Central Bank Rate (%)",
+                "  tbill_91d      91-day Treasury bill yield (%)",
+                "  usd_kes        USD/KES spot",
+                "  inflation_yoy  CPI YoY (%)",
+                "  lending_rate   Commercial bank lending rate (%)",
+                "",
+                "Fill rows from CBK / KNBS publications (manual download only).",
+                "After filling, create an empty marker file next to the CSV:",
+                "  macro_cbk.csv.official",
+                "(full name = CSV path + '.official', not a replaced suffix)",
+                "so ingest sets macro_source=official.",
+                "Without the marker, a populated file is treated as synthetic/approx.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    print(f"wrote empty template {OUT}")
+    print(f"docs {DOCS}")
+
+
+def write_approx() -> None:
     idx = pd.date_range("2007-01-01", "2025-12-01", freq="MS")
     cbk = _series(CBR_POINTS, idx)
     usd = _series(USD_POINTS, idx)
@@ -79,8 +124,22 @@ def main() -> int:
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT, index=False)
-    print(f"wrote {OUT} rows={len(df)}")
-    print("NOTE: Approximate public anchors — replace with official CBK/KNBS series.")
+    print(f"wrote approx {OUT} rows={len(df)} (macro_source will be synthetic until .official marker)")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument(
+        "--approx",
+        action="store_true",
+        help="Write approximate public anchors (still labeled synthetic unless .official)",
+    )
+    args = ap.parse_args()
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    if args.approx:
+        write_approx()
+    else:
+        write_empty_template()
     return 0
 
 

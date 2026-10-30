@@ -176,14 +176,22 @@ def clean_prices(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_sectors(raw_dir: Path) -> pd.DataFrame:
+    """Load sector maps; skip empty/corrupt CSVs; prefer latest non-empty map; coalesce years."""
     files = sorted(Path(raw_dir).rglob("*sector*.csv"))
+    empty = pd.DataFrame(columns=["stock_code", "stock_name", "market_sector", "as_of_year"])
     if not files:
-        return pd.DataFrame(columns=["stock_code", "stock_name", "market_sector", "as_of_year"])
+        return empty
     frames = []
     for path in files:
-        df = pd.read_csv(path)
+        try:
+            if path.stat().st_size == 0:
+                continue
+            df = pd.read_csv(path)
+            if df.empty or len(df.columns) < 2:
+                continue
+        except Exception:  # noqa: BLE001
+            continue
         df = _normalize_columns(df)
-        # Heuristic year from filename
         year = None
         for token in path.stem.replace("-", "_").split("_"):
             if token.isdigit() and len(token) == 4:
@@ -198,9 +206,21 @@ def load_sectors(raw_dir: Path) -> pd.DataFrame:
             elif "name" in cl:
                 rename[c] = "stock_name"
         df = df.rename(columns=rename)
-        df["as_of_year"] = year
-        frames.append(df)
+        if "stock_code" not in df.columns or "market_sector" not in df.columns:
+            continue
+        if "stock_name" not in df.columns:
+            df["stock_name"] = df["stock_code"]
+        df["as_of_year"] = year if year is not None else 0
+        df = df.dropna(subset=["stock_code", "market_sector"])
+        df = df[df["market_sector"].astype(str).str.strip().ne("")]
+        if df.empty:
+            continue
+        frames.append(df[["stock_code", "stock_name", "market_sector", "as_of_year"]])
+    if not frames:
+        return empty
     out = pd.concat(frames, ignore_index=True)
     out["stock_code"] = out["stock_code"].astype(str).str.strip().str.upper()
+    out["market_sector"] = out["market_sector"].astype(str).str.strip()
+    # Prefer latest year; among same year keep last non-empty sector
     out = out.sort_values("as_of_year").drop_duplicates("stock_code", keep="last")
-    return out[["stock_code", "stock_name", "market_sector", "as_of_year"]]
+    return out[["stock_code", "stock_name", "market_sector", "as_of_year"]].reset_index(drop=True)

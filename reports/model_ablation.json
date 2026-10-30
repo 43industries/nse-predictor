@@ -1,0 +1,24 @@
+{
+  "binary": {
+    "valid_rank_ic": 0.16001461681899276,
+    "best_params": {
+      "num_leaves": 15,
+      "min_child_samples": 60,
+      "learning_rate": 0.05,
+      "n_estimators": 500
+    },
+    "tune_info": {
+      "best_rank_ic": 0.1183890932267683,
+      "n_trials": 8
+    },
+    "decision_mode": "threshold",
+    "calibration_status": "isotonic"
+  },
+  "ranker": {
+    "valid_rank_ic": 0.1289192778067349,
+    "decision_mode": "threshold",
+    "calibration_status": "isotonic"
+  },
+  "selected": "binary",
+  "selected_rank_ic": 0.16001461681899276
+}

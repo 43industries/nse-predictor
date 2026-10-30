@@ -1,0 +1,46 @@
+{
+  "universe": [
+    "SCOM",
+    "EQTY",
+    "KCB",
+    "COOP",
+    "ABSA",
+    "KEGN",
+    "KNRE",
+    "KPLC",
+    "BRIT",
+    "CIC",
+    "EABL",
+    "CTUM",
+    "KQ",
+    "NCBA",
+    "HFCK",
+    "^NASI",
+    "^N20I"
+  ],
+  "investable": [
+    "SCOM",
+    "EQTY",
+    "KCB",
+    "COOP",
+    "ABSA",
+    "KEGN",
+    "KNRE",
+    "KPLC",
+    "BRIT",
+    "CIC",
+    "EABL",
+    "CTUM",
+    "KQ",
+    "NCBA",
+    "HFCK"
+  ],
+  "gates": {
+    "n_days_min": 1500,
+    "last_date_min": "2023-01-01",
+    "median_price_min": 1.0,
+    "recent_median_price_min": 1.0,
+    "recent_window_days": 252,
+    "adv_above_median_preferred": true
+  }
+}
