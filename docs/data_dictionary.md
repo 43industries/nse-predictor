@@ -68,7 +68,7 @@ Empty official template: `python scripts/build_macro_template.py`. Approximate a
 
 ### Fundamentals (`data/external/fundamentals.csv`)
 
-Point-in-time company fundamentals. Expand beyond `fundamentals_sample.csv`.
+Point-in-time company fundamentals. Expand beyond `fundamentals_sample.csv`. Bank FY metrics are curated from kenyanbanks.com (primary; no live scrape), with NPL/HFCK gap fills from Cytonn FY’2025 / ApexHub as noted in `fundamentals.README.txt`.
 
 | Column | Description |
 | --- | --- |
@@ -78,9 +78,23 @@ Point-in-time company fundamentals. Expand beyond `fundamentals_sample.csv`.
 | eps | Earnings per share |
 | dividend | Dividend per share for the period |
 | book_value | Book value per share |
-| period | Label e.g. FY2023, H1-2024 |
+| period | Label e.g. FY2023, H1-2024, FY2025 |
+| pat | Profit after tax (KES bn) — banks |
+| pat_yoy | PAT year-over-year % — banks |
+| roe | Return on equity % — banks |
+| roa | Return on assets % — banks |
+| nim | Net interest margin % — banks |
+| cir | Cost-to-income ratio % — banks |
+| npl | Non-performing loan ratio % — banks |
+| assets | Total assets (KES bn) — banks |
+| loans | Net loans (KES bn) — banks |
+| deposits | Customer deposits (KES bn) — banks |
+| nii | Net interest income (KES bn) — banks |
+| nfi | Non-funded / non-interest income (KES bn) — banks |
 
-**Leakage rule:** `merge_asof` on `publish_date` (fallback `report_date`) backward to `trade_date`. Derived features `eps_yoy`, `div_yield_proxy` are included only if non-null coverage ≥ 30% of rows; otherwise train logs “skipped low coverage”.
+**Leakage rule:** `merge_asof` on `publish_date` (fallback `report_date`) backward to `trade_date`. Derived features (`eps_yoy`, `div_yield_proxy`, `book_to_price`, `loan_deposit_ratio`, bank peer medians) are included only if non-null coverage ≥ 30% of rows; otherwise train logs “skipped low coverage”.
+
+**Bank tickers** (`nse_predictor.ingest.banks.BANK_TICKERS`): EQTY, KCB, COOP, ABSA, NCBA, HFCK, SCBK, DTK, IMH, SBIC.
 
 ### Feature cache (`features_v2`)
 
@@ -98,9 +112,13 @@ Single source of truth. Groups: `CORE_PRICE`, `RELATIVE`, `LIQUIDITY`, `CALENDAR
 | sector_xs, stock_vs_sector_1d | RELATIVE | Sector relative |
 | rsi_vs_nasi, ma20_xs | RELATIVE | RSI / MA20 vs NASI |
 | adv_20, rel_volume, amihud_20, jump_flag_1d, zero_vol_streak | LIQUIDITY | Volume / illiquidity |
-| dow, month, results_season | CALENDAR | Calendar |
+| dow, month, results_season, near_book_closure, days_since_book_closure | CALENDAR | Calendar + book-closure window |
+| news_sentiment_1d, news_sentiment_5d, news_count_5d | NEWS | Leakage-safe news sentiment from `news.csv` |
+| nse20_ret, xs_ret_1d_nse20, stock_vs_nse20_1d | RELATIVE | NSE20/N20I context when series present |
 | cbk_*, usd_kes*, inflation_*, tbill_91d, lending_rate | MACRO_OFFICIAL | Only in **model** when `macro_source=official` |
 | eps, eps_yoy, div_yield_proxy, book_value, book_to_price | FUNDAMENTALS | As-of join; model only if coverage ≥ 30% |
+| roe, roa, nim, cir, npl, pat_yoy, loan_deposit_ratio | FUNDAMENTALS | Bank metrics as-of publish_date |
+| roe_vs_bank_med, npl_vs_bank_med, pat_yoy_vs_bank_med | FUNDAMENTALS | Same-day bank median relatives |
 
 Ablation presets (valid only): `core_only`, `core_relative`, `full_gated` → `reports/feature_ablation.json`. Feature QA: `python scripts/run_feature_qa.py`.
 

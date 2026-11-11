@@ -3,6 +3,7 @@
     "SCOM",
     "EQTY",
     "KCB",
+    "KENO",
     "COOP",
     "ABSA",
     "KEGN",
@@ -15,6 +16,8 @@
     "KQ",
     "NCBA",
     "HFCK",
+    "SCAN",
+    "NSE",
     "^NASI",
     "^N20I"
   ],
@@ -22,6 +25,7 @@
     "SCOM",
     "EQTY",
     "KCB",
+    "KENO",
     "COOP",
     "ABSA",
     "KEGN",
@@ -33,7 +37,9 @@
     "CTUM",
     "KQ",
     "NCBA",
-    "HFCK"
+    "HFCK",
+    "SCAN",
+    "NSE"
   ],
   "gates": {
     "n_days_min": 1500,

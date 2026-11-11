@@ -13,6 +13,7 @@ from nse_predictor.eval.metrics import (
     brier_score,
     direction_metrics,
     expected_calibration_error,
+    rank_ic,
 )
 
 
@@ -131,8 +132,15 @@ def tune_threshold(
     max_threshold: float = 0.65,
     metric: str = "f1",
     reject_always_up: bool = True,
+    prices: pd.DataFrame | None = None,
+    panel: pd.DataFrame | None = None,
+    abstain_band: float = 0.05,
+    cost_bps: float = 50.0,
 ) -> dict:
-    """Pick threshold on F1 or balanced accuracy within bounds; reject always-up."""
+    """Pick threshold on F1, balanced accuracy, or costed utility within bounds."""
+    from nse_predictor.eval.backtest import threshold_utility
+    from nse_predictor.models.tabular import labels_from_proba
+
     y_true = np.asarray(y_true).astype(int)
     y_prob = np.asarray(y_prob).astype(float)
     lo, hi = float(min_threshold), float(max_threshold)
@@ -149,6 +157,22 @@ def tune_threshold(
     grid = np.asarray([t for t in grid if lo - 1e-9 <= float(t) <= hi + 1e-9], dtype=float)
     if len(grid) == 0:
         grid = np.array([0.5])
+
+    if metric == "utility":
+        return _tune_threshold_utility(
+            y_true=y_true,
+            y_prob=y_prob,
+            grid=grid,
+            lo=lo,
+            hi=hi,
+            reject_always_up=reject_always_up,
+            prices=prices,
+            panel=panel,
+            abstain_band=abstain_band,
+            cost_bps=cost_bps,
+            labels_from_proba=labels_from_proba,
+            threshold_utility=threshold_utility,
+        )
 
     best_t = 0.5
     best_score = -1.0
@@ -181,6 +205,140 @@ def tune_threshold(
         "metric": metric,
         "min_threshold": lo,
         "max_threshold": hi,
+        "valid_utility": float("nan"),
+    }
+
+
+def _tune_threshold_utility(
+    *,
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    grid: np.ndarray,
+    lo: float,
+    hi: float,
+    reject_always_up: bool,
+    prices: pd.DataFrame | None,
+    panel: pd.DataFrame | None,
+    abstain_band: float,
+    cost_bps: float,
+    labels_from_proba,
+    threshold_utility,
+) -> dict:
+    """Max costed utility among thr that pass Rank IC + Brier gates."""
+    always_up_acc = float(y_true.mean()) if len(y_true) else 0.5
+    empty = {
+        "threshold": 0.5,
+        "valid_metrics": {},
+        "f1_up": 0.0,
+        "found": False,
+        "beats_always_up": False,
+        "rejected_always_up": 0,
+        "metric": "utility",
+        "min_threshold": lo,
+        "max_threshold": hi,
+        "valid_utility": float("nan"),
+        "valid_rank_ic_gate": float("nan"),
+        "brier_ref": float("nan"),
+        "gate_rejects": 0,
+    }
+    if panel is None or panel.empty or prices is None or "price" not in getattr(prices, "columns", []):
+        return empty
+
+    ric = float("nan")
+    if "y_ret_5d_xs" in panel.columns:
+        tmp = panel[["trade_date", "stock_code", "y_ret_5d_xs"]].copy()
+        tmp["prob_up"] = y_prob
+        ric = float((rank_ic(tmp, "prob_up", "y_ret_5d_xs") or {}).get("mean_ic") or float("nan"))
+
+    def _brier_nonflat(thr: float) -> float:
+        labels = labels_from_proba(
+            y_prob,
+            threshold=float(thr),
+            abstain_band=float(abstain_band),
+            mode="threshold",
+            trade_dates=panel["trade_date"],
+        )
+        yp = binary_from_labels(labels)
+        mask = ~np.isnan(yp)
+        if mask.sum() < 20:
+            return float("nan")
+        return float(brier_score(y_true[mask], y_prob[mask]))
+
+    brier_ref = _brier_nonflat(0.5)
+    empty["brier_ref"] = brier_ref
+    empty["valid_rank_ic_gate"] = ric
+
+    best_t = 0.5
+    best_util = float("-inf")
+    best_metrics: dict = {}
+    rejected = 0
+    gate_rejects = 0
+    for t in grid:
+        labels = labels_from_proba(
+            y_prob,
+            threshold=float(t),
+            abstain_band=float(abstain_band),
+            mode="threshold",
+            trade_dates=panel["trade_date"],
+        )
+        yp = binary_from_labels(labels)
+        mask = ~np.isnan(yp)
+        if mask.sum() < 20:
+            gate_rejects += 1
+            continue
+        pred = yp[mask].astype(int)
+        yt = y_true[mask]
+        if reject_always_up and _is_always_up(yt, pred):
+            rejected += 1
+            continue
+        if not (ric == ric and ric > 0):
+            gate_rejects += 1
+            continue
+        brier_t = float(brier_score(yt, y_prob[mask]))
+        if brier_ref == brier_ref and brier_t > brier_ref + 0.01:
+            gate_rejects += 1
+            continue
+        util = threshold_utility(
+            prices,
+            panel,
+            y_prob,
+            float(t),
+            abstain_band=abstain_band,
+            cost_bps=cost_bps,
+        )
+        if util != util:
+            gate_rejects += 1
+            continue
+        f1 = float(f1_score(yt, pred, pos_label=1, zero_division=0))
+        bal = float(balanced_accuracy_score(yt, pred))
+        m = direction_metrics(yt, pred, y_prob[mask])
+        if util > best_util + 1e-12:
+            best_util = float(util)
+            best_t = float(t)
+            best_metrics = {
+                **m,
+                "f1_up": f1,
+                "balanced_acc": bal,
+                "brier_nonflat": brier_t,
+                "utility": best_util,
+            }
+
+    found = bool(best_metrics) and best_util > float("-inf")
+    beats = found and (best_metrics.get("accuracy", 0) > always_up_acc + 0.005)
+    return {
+        "threshold": best_t if found else 0.5,
+        "valid_metrics": best_metrics,
+        "f1_up": best_metrics.get("f1_up", 0.0),
+        "found": found,
+        "beats_always_up": beats,
+        "rejected_always_up": rejected,
+        "metric": "utility",
+        "min_threshold": lo,
+        "max_threshold": hi,
+        "valid_utility": float(best_util) if found else float("nan"),
+        "valid_rank_ic_gate": ric,
+        "brier_ref": brier_ref,
+        "gate_rejects": gate_rejects,
     }
 
 
@@ -260,7 +418,11 @@ def write_train_val_report(results: dict, path: Path) -> None:
         lines.append("## Selection (from validation)")
         lines.append(f"- Direction head: **{sel.get('direction_head', 'binary')}**")
         lines.append(f"- Decision mode: **{sel.get('decision_mode', 'threshold')}**")
+        lines.append(f"- Decision metric: **{sel.get('decision_metric', 'utility')}**")
         lines.append(f"- Direction threshold: **{sel.get('threshold', 0.5):.2f}**")
+        vu = sel.get("valid_utility")
+        if isinstance(vu, (int, float)) and vu == vu:
+            lines.append(f"- Valid utility (costed book): **{vu:.1%}**")
         lines.append(f"- Calibration: **{sel.get('calibration', 'none')}** ({sel.get('calibration_status', '')})")
         if sel.get("best_params"):
             lines.append(f"- Best params: `{sel.get('best_params')}`")
@@ -301,11 +463,22 @@ def write_train_val_report(results: dict, path: Path) -> None:
         if dm.get("abstain_rate") is not None:
             lines.append(f"- Abstain rate (flat): **{dm.get('abstain_rate', 0):.1%}**")
     ric = results.get("diagnostics", {}).get("rank_ic") or {}
+    ric_b = results.get("diagnostics", {}).get("rank_ic_bootstrap") or {}
     if ric.get("n_days"):
+        ci_lo, ci_hi = ric_b.get("ci_low"), ric_b.get("ci_high")
+        ci_s = ""
+        if isinstance(ci_lo, (int, float)) and isinstance(ci_hi, (int, float)) and ci_lo == ci_lo and ci_hi == ci_hi:
+            ci_s = f" · 95% bootstrap CI [{ci_lo:.3f}, {ci_hi:.3f}]"
         lines.append(
             f"- Rank IC (prob_up vs y_ret_5d_xs): **mean {ric.get('mean_ic', float('nan')):.3f}** "
             f"(median {ric.get('median_ic', float('nan')):.3f}, days {ric.get('n_days')})"
+            f"{ci_s}"
         )
+    at_chance = results.get("diagnostics", {}).get("at_chance_stocks") or [
+        r["stock_code"] for r in (results.get("diagnostics", {}).get("per_stock") or []) if r.get("flag") == "at_chance"
+    ]
+    if at_chance:
+        lines.append(f"- At-chance names: {', '.join(at_chance)}")
     lines.append("")
     cal = results.get("diagnostics", {}).get("calibration") or {}
     if cal:

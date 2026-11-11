@@ -139,3 +139,48 @@ def rank_ic(
         "n_days": int(len(arr)),
         "ic_std": float(np.std(arr)),
     }
+
+
+def rank_ic_bootstrap(
+    panel: pd.DataFrame,
+    pred_col: str,
+    target_col: str = "y_ret_5d_xs",
+    date_col: str = "trade_date",
+    min_names: int = 5,
+    n_boot: int = 500,
+    seed: int = 42,
+    alpha: float = 0.05,
+) -> dict:
+    """Day-resampled bootstrap CI for mean Rank IC."""
+    base = rank_ic(panel, pred_col, target_col, date_col=date_col, min_names=min_names)
+    if panel.empty or pred_col not in panel.columns or target_col not in panel.columns:
+        return {**base, "ci_low": float("nan"), "ci_high": float("nan"), "n_boot": 0}
+    d = panel[[date_col, pred_col, target_col]].dropna().copy()
+    d[date_col] = pd.to_datetime(d[date_col])
+    daily: list[float] = []
+    for _, g in d.groupby(date_col):
+        if len(g) < min_names:
+            continue
+        if g[pred_col].nunique() < 2 or g[target_col].nunique() < 2:
+            continue
+        ic = g[pred_col].corr(g[target_col], method="spearman")
+        if pd.notna(ic):
+            daily.append(float(ic))
+    if len(daily) < 10:
+        return {**base, "ci_low": float("nan"), "ci_high": float("nan"), "n_boot": 0}
+    arr = np.asarray(daily, dtype=float)
+    rng = np.random.default_rng(seed)
+    boots = np.empty(int(n_boot), dtype=float)
+    n = len(arr)
+    for i in range(int(n_boot)):
+        sample = arr[rng.integers(0, n, size=n)]
+        boots[i] = float(np.mean(sample))
+    lo = float(np.quantile(boots, alpha / 2.0))
+    hi = float(np.quantile(boots, 1.0 - alpha / 2.0))
+    return {
+        **base,
+        "ci_low": lo,
+        "ci_high": hi,
+        "n_boot": int(n_boot),
+        "alpha": float(alpha),
+    }

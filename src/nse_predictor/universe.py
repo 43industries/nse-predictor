@@ -21,7 +21,7 @@ def _equity_frame(prices: pd.DataFrame) -> pd.DataFrame:
     return prices.loc[~exclude].copy()
 
 
-def pick_universe(prices: pd.DataFrame, n: int = 15) -> list[str]:
+def pick_universe(prices: pd.DataFrame, n: int = 18) -> list[str]:
     """Liquidity + hygiene screen; append index codes for feature context only."""
     eq = _equity_frame(prices)
     eq["trade_date"] = pd.to_datetime(eq["trade_date"])

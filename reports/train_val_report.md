@@ -7,78 +7,81 @@ Decision-support research only - not investment advice.
 - **Return model:** 5d **excess** vs NASI + residual quantile band.
 - **Universe:** investable ordinary shares (liquidity / price / history gates).
 
-- Investable names: SCOM, EQTY, KCB, COOP, ABSA, KEGN, KNRE, KPLC, BRIT, CIC, EABL, CTUM, KQ, NCBA, HFCK
+- Investable names: SCOM, EQTY, KCB, KENO, COOP, ABSA, KEGN, KNRE, KPLC, BRIT, CIC, EABL, CTUM, KQ, NCBA, HFCK, SCAN, NSE
 
-> **validation_status=warn** — flagged_frac=53% ≥ 40%; macro_source=synthetic
+> **validation_status=warn** — flagged_frac=47% ≥ 40%
 
 ## Protocol
 - Embargo: **True** · horizon **5d** · train_end `2019-12-31` · valid_end `2022-12-31`
-- Fit rows after embargo: train 29032 (raw 29058), valid 7241 (raw 7301)
+- Fit rows after embargo: train 34588 (raw 34620), valid 8297 (raw 8364)
 
 ## Time splits
-- **train**: ['2008-01-04', '2019-12-24', 29032]
-- **valid**: ['2020-01-06', '2022-12-23', 7241]
-- **test**: ['2023-01-05', '2025-12-22', 8437]
+- **train**: ['2008-01-04', '2019-12-24', 34588]
+- **valid**: ['2020-01-06', '2022-12-23', 8297]
+- **test**: ['2023-01-05', '2025-12-24', 9662]
 
 ## Selection (from validation)
 - Direction head: **binary**
 - Decision mode: **threshold**
-- Direction threshold: **0.38**
+- Decision metric: **utility**
+- Direction threshold: **0.60**
+- Valid utility (costed book): **1.8%**
 - Calibration: **isotonic** (isotonic)
-- Best params: `{'num_leaves': 15, 'min_child_samples': 60, 'learning_rate': 0.05, 'n_estimators': 500}`
-- Valid accuracy: **57.3%** (lift vs always-up +10.6%)
-- Return residual quantiles (excess): [-0.069, 0.048] (target ~80% coverage)
+- Best params: `{'num_leaves': 31, 'min_child_samples': 40, 'learning_rate': 0.05, 'colsample_bytree': 0.7, 'n_estimators': 500}`
+- Valid accuracy: **56.8%** (lift vs always-up +11.4%)
+- Return residual quantiles (excess): [-0.052, 0.054] (target ~80% coverage)
 
 ## Test holdout (direction on excess labels)
-- Always up: 51.3%
-- Majority class: 51.3%
+- Always up: 51.0%
+- Majority class: 51.0%
 - MA 5/20: 47.3%
-- LightGBM (selected): **54.8%** (precision_up 55.1%, recall_up 60.1%, n_scored 6343, abstain 0.24819248548062106)
-- Abstain rate (flat): **24.8%**
-- Rank IC (prob_up vs y_ret_5d_xs): **mean 0.133** (median 0.143, days 730)
+- LightGBM (selected): **55.1%** (precision_up 59.7%, recall_up 35.7%, n_scored 8709, abstain 0.09863382322500518)
+- Abstain rate (flat): **9.9%**
+- Rank IC (prob_up vs y_ret_5d_xs): **mean 0.166** (median 0.180, days 732) · 95% bootstrap CI [0.144, 0.185]
+- At-chance names: NCBA, KQ, ABSA, COOP, KPLC, CTUM, KNRE, EQTY
 
 ## Calibration (test, non-flat)
-- Brier **0.2528** · ECE **0.0754** · std(prob) **0.138** · unique probs **39**
+- Brier **0.2506** · ECE **0.0630** · std(prob) **0.130** · unique probs **23**
 
 ## Confusion (test, non-flat only)
-- TP 1937 · FP 1578 · TN 1540 · FN 1288
+- TP 1582 · FP 1068 · TN 3214 · FN 2845
 
 ## Excess return interval (test)
-- Coverage **74.2%**, mean width **11.7%**
+- Coverage **72.8%**, mean width **12.0%**
 
 ## Stress Rank IC (OOS retrain)
-- covid_2020: {'mean_ic': 0.12870598528836788, 'median_ic': 0.12967032967032965, 'n_days': 211, 'ic_std': 0.320988374766932, 'abstain_rate': 0.29200652528548127}
-- fx_2023: {'mean_ic': 0.023004181535341235, 'median_ic': 0.03922851696456023, 'n_days': 242, 'ic_std': 0.3002055481252739, 'abstain_rate': 0.24737945492662475}
+- covid_2020: {'mean_ic': 0.08312467709230856, 'median_ic': 0.08241758241758242, 'n_days': 211, 'ic_std': 0.30421581461341424, 'abstain_rate': 0.29070181688635555}
+- fx_2023: {'mean_ic': 0.12948263070154858, 'median_ic': 0.14521460932458408, 'n_days': 243, 'ic_std': 0.2761484167068252, 'abstain_rate': 0.230958988590811}
 
 ## Per-stock test accuracy (top / bottom)
 | Stock | Accuracy | N | Flag |
 | --- | --- | --- | --- |
-| NCBA | 59.1% | 450 |  |
-| KPLC | 58.3% | 482 |  |
-| KCB | 58.3% | 405 |  |
-| CIC | 58.0% | 417 |  |
-| ABSA | 57.1% | 385 | at_chance |
+| KCB | 60.3% | 496 |  |
+| HFCK | 59.1% | 560 |  |
+| CIC | 58.9% | 521 |  |
+| SCAN | 58.0% | 574 |  |
+| SCOM | 57.6% | 413 |  |
 | … | | | |
-| KEGN | 52.3% | 390 | at_chance |
-| CTUM | 51.3% | 429 | at_chance |
-| KNRE | 51.2% | 457 | at_chance |
-| HFCK | 51.2% | 506 | at_chance |
-| SCOM | 50.7% | 343 | at_chance |
+| BRIT | 53.0% | 547 |  |
+| KPLC | 52.9% | 548 | at_chance |
+| CTUM | 51.6% | 527 | at_chance |
+| KNRE | 50.2% | 538 | at_chance |
+| EQTY | 49.0% | 486 | at_chance |
 
-- Flagged names: ABSA, EABL, KQ, KEGN, CTUM, KNRE, HFCK, SCOM
+- Flagged names: NCBA, KQ, ABSA, COOP, KPLC, CTUM, KNRE, EQTY
 
 ## Walk-forward
-- Mean Rank IC: **0.120** · IC>0 folds: **8/8** · beats always-up: **7/8**
-- wf_2018: acc 56.1% · Rank IC 0.133 · abstain 20.8% · beats=True
-- wf_2019: acc 54.1% · Rank IC 0.009 · abstain 18.1% · beats=True
-- wf_2020: acc 59.5% · Rank IC 0.139 · abstain 37.1% · beats=True
-- wf_2021: acc 56.2% · Rank IC 0.130 · abstain 42.9% · beats=True
-- wf_2022: acc 55.8% · Rank IC 0.182 · abstain 9.5% · beats=True
-- wf_2023: acc 51.3% · Rank IC 0.039 · abstain 14.3% · beats=False
-- wf_2024: acc 57.1% · Rank IC 0.155 · abstain 38.2% · beats=True
-- wf_2025: acc 56.8% · Rank IC 0.177 · abstain 15.2% · beats=True
+- Mean Rank IC: **0.141** · IC>0 folds: **8/8** · beats always-up: **7/8**
+- wf_2018: acc 54.4% · Rank IC 0.113 · abstain 26.7% · beats=True
+- wf_2019: acc 56.1% · Rank IC 0.035 · abstain 22.7% · beats=True
+- wf_2020: acc 63.9% · Rank IC 0.114 · abstain 50.2% · beats=True
+- wf_2021: acc 57.3% · Rank IC 0.098 · abstain 48.4% · beats=True
+- wf_2022: acc 55.3% · Rank IC 0.245 · abstain 5.2% · beats=True
+- wf_2023: acc 45.9% · Rank IC 0.142 · abstain 8.7% · beats=False
+- wf_2024: acc 53.6% · Rank IC 0.136 · abstain 21.5% · beats=True
+- wf_2025: acc 60.4% · Rank IC 0.245 · abstain 25.6% · beats=True
 
 ## Research backtest (not for selection)
-- Equal-weight long/flat · total return **15.5%** · buy-hold **136.8%** · max DD **-22.0%** · names 15
+- Equal-weight long/flat · total return **94.1%** · buy-hold **170.7%** · max DD **-5.1%** · names 17
 - Disclaimer: `research_only_not_for_selection`
 

@@ -372,6 +372,8 @@ class ReturnIntervalModel:
         self.q_high_: float = 0.03
         self.quantile_low_p_: float = 0.10
         self.quantile_high_p_: float = 0.90
+        self.vol_scale_ref_: float = 1.0
+        self.vol_scaled_: bool = False
         self.best_iteration_: int | None = None
         reg = LGBMRegressor(**self.params) if HAS_LGBM else GradientBoostingRegressor(random_state=42)
         self.pipe = _imputer_model_pipe(reg)
@@ -423,20 +425,82 @@ class ReturnIntervalModel:
         self.q_low_, self.q_high_ = -self.residual_std_, self.residual_std_
         return self
 
+    @staticmethod
+    def _vol_scale(vol: np.ndarray | None, ref: float) -> np.ndarray | None:
+        if vol is None:
+            return None
+        v = np.asarray(vol, dtype=float)
+        ref = float(ref) if ref and ref == ref and ref > 0 else 1.0
+        scale = v / ref
+        scale = np.where(np.isfinite(scale), scale, 1.0)
+        return np.clip(scale, 0.5, 2.5)
+
     def set_residual_quantiles(
         self,
         df: pd.DataFrame,
         q_low: float = 0.10,
         q_high: float = 0.90,
+        vol: np.ndarray | pd.Series | None = None,
+        target_coverage: float = 0.80,
+        calibrate_coverage: bool = True,
     ) -> "ReturnIntervalModel":
         mask = df[self.target_col].notna()
         y = df.loc[mask, self.target_col].astype(float).values
         pred = self.pipe.predict(df.loc[mask, self.features])
         resid = y - pred
-        self.quantile_low_p_, self.quantile_high_p_ = float(q_low), float(q_high)
-        self.q_low_ = float(np.quantile(resid, q_low))
-        self.q_high_ = float(np.quantile(resid, q_high))
         self.residual_std_ = float(np.std(resid)) or self.residual_std_
+
+        vol_arr: np.ndarray | None
+        if vol is not None:
+            vol_arr = np.asarray(vol, dtype=float)
+            if len(vol_arr) != int(mask.sum()):
+                # Align by taking masked rows if full-length vol was passed
+                if len(vol_arr) == len(df):
+                    vol_arr = vol_arr[mask.values if hasattr(mask, "values") else mask]
+                else:
+                    vol_arr = None
+        elif "vol_20" in df.columns:
+            vol_arr = df.loc[mask, "vol_20"].astype(float).values
+        else:
+            vol_arr = None
+
+        if vol_arr is not None and np.isfinite(vol_arr).sum() >= 20:
+            med = float(np.nanmedian(vol_arr))
+            self.vol_scale_ref_ = med if med > 0 else 1.0
+            self.vol_scaled_ = True
+        else:
+            self.vol_scale_ref_ = 1.0
+            self.vol_scaled_ = False
+            vol_arr = None
+
+        scale = self._vol_scale(vol_arr, self.vol_scale_ref_)
+        if scale is None:
+            scale = np.ones(len(resid), dtype=float)
+
+        def _apply(p_lo: float, p_hi: float) -> tuple[float, float, float]:
+            ql = float(np.quantile(resid, p_lo))
+            qh = float(np.quantile(resid, p_hi))
+            lo = pred + ql * scale
+            hi = pred + qh * scale
+            cov = float(np.mean((y >= lo) & (y <= hi))) if len(y) else float("nan")
+            return ql, qh, cov
+
+        p_lo, p_hi = float(q_low), float(q_high)
+        ql, qh, cov = _apply(p_lo, p_hi)
+        if calibrate_coverage and len(resid) >= 50:
+            best = (p_lo, p_hi, ql, qh, cov)
+            best_diff = abs((cov if cov == cov else 0.0) - target_coverage)
+            for p in np.linspace(0.05, 0.20, 16):
+                cand_lo, cand_hi = float(p), float(1.0 - p)
+                c_ql, c_qh, c_cov = _apply(cand_lo, cand_hi)
+                diff = abs((c_cov if c_cov == c_cov else 0.0) - target_coverage)
+                if diff + 1e-12 < best_diff:
+                    best = (cand_lo, cand_hi, c_ql, c_qh, c_cov)
+                    best_diff = diff
+            p_lo, p_hi, ql, qh, cov = best
+
+        self.quantile_low_p_, self.quantile_high_p_ = p_lo, p_hi
+        self.q_low_, self.q_high_ = ql, qh
         return self
 
     def copy_interval_from(self, other: "ReturnIntervalModel") -> "ReturnIntervalModel":
@@ -445,18 +509,33 @@ class ReturnIntervalModel:
         self.quantile_low_p_ = other.quantile_low_p_
         self.quantile_high_p_ = other.quantile_high_p_
         self.residual_std_ = other.residual_std_
+        self.vol_scale_ref_ = getattr(other, "vol_scale_ref_", 1.0)
+        self.vol_scaled_ = bool(getattr(other, "vol_scaled_", False))
         return self
 
-    def predict(self, df: pd.DataFrame, z: float | None = None) -> pd.DataFrame:
+    def predict(
+        self,
+        df: pd.DataFrame,
+        z: float | None = None,
+        vol: np.ndarray | pd.Series | None = None,
+    ) -> pd.DataFrame:
         pred = self.pipe.predict(df[self.features])
         out = df[["trade_date", "stock_code"]].copy()
         out["pred_value"] = pred
-        if z is None:
-            out["lower"] = pred + self.q_low_
-            out["upper"] = pred + self.q_high_
-        else:
+        if z is not None:
             out["lower"] = pred - z * self.residual_std_
             out["upper"] = pred + z * self.residual_std_
+        else:
+            scale = self._vol_scale(
+                None if vol is None else np.asarray(vol, dtype=float),
+                getattr(self, "vol_scale_ref_", 1.0),
+            )
+            if scale is None or not getattr(self, "vol_scaled_", False):
+                out["lower"] = pred + self.q_low_
+                out["upper"] = pred + self.q_high_
+            else:
+                out["lower"] = pred + self.q_low_ * scale
+                out["upper"] = pred + self.q_high_ * scale
         out["model_name"] = self.model_name
         out["target_col"] = self.target_col
         return out

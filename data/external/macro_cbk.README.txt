@@ -1,0 +1,21 @@
+macro_cbk.csv — CBK / KNBS macro panel
+
+Columns:
+  observe_date   ISO date when the print was observable (YYYY-MM-DD)
+  cbk_rate       Central Bank Rate (%)
+  tbill_91d      91-day Treasury bill yield (%)
+  usd_kes        USD/KES spot
+  inflation_yoy  CPI YoY (%)
+  lending_rate   Commercial bank lending rate (%)
+
+Current file: curated public anchors (CBR / FX / inflation waypoints from
+published CBK/KNBS history), monthly interpolated. Marker file
+macro_cbk.csv.official is present so ingest sets macro_source=official.
+
+Replace with a full official extract when available; keep the .official
+marker only when the CSV is intentional research/official input.
+
+Rebuild:
+  python scripts/build_macro_template.py --approx
+  (then recreate macro_cbk.csv.official if desired)
+  python scripts/run_ingest.py

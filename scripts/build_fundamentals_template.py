@@ -25,6 +25,18 @@ COLS = [
     "dividend",
     "book_value",
     "period",
+    "pat",
+    "pat_yoy",
+    "roe",
+    "roa",
+    "nim",
+    "cir",
+    "npl",
+    "assets",
+    "loans",
+    "deposits",
+    "nii",
+    "nfi",
 ]
 
 
@@ -42,7 +54,6 @@ def main() -> int:
             investable = list(data.get("investable") or [])
 
     rows = [{"stock_code": c, **{k: "" for k in COLS if k != "stock_code"}} for c in investable]
-    # One blank stub row per name — user duplicates for FY/H1 history
     pd.DataFrame(rows, columns=COLS).to_csv(OUT, index=False)
     DOCS.write_text(
         "\n".join(
@@ -59,8 +70,21 @@ def main() -> int:
                 "  eps            Earnings per share",
                 "  dividend       DPS for the period",
                 "  book_value     Book value per share",
-                "  period         e.g. FY2023, H1-2024",
+                "  period         e.g. FY2023, H1-2024, FY2025",
+                "  pat            Profit after tax (KES bn) — banks",
+                "  pat_yoy        PAT year-over-year % — banks",
+                "  roe            Return on equity % — banks",
+                "  roa            Return on assets % — banks",
+                "  nim            Net interest margin % — banks",
+                "  cir            Cost-to-income ratio % — banks",
+                "  npl            Non-performing loan ratio % — banks",
+                "  assets         Total assets (KES bn) — banks",
+                "  loans          Net loans (KES bn) — banks",
+                "  deposits       Customer deposits (KES bn) — banks",
+                "  nii            Net interest income (KES bn) — banks",
+                "  nfi            Non-funded / non-interest income (KES bn) — banks",
                 "",
+                "Bank FY seed source: curated from kenyanbanks.com (no live scrape).",
                 "Leakage: models join on publish_date (fallback report_date) backward to trade_date.",
                 "Features included only if coverage ≥ 30% of train rows.",
                 "Do not invent EPS — leave blank until official filings are entered.",

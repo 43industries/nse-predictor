@@ -8,17 +8,40 @@ import numpy as np
 import pandas as pd
 
 from nse_predictor.config import settings
-from nse_predictor.features.registry import FUNDAMENTALS as FUND_FEATURE_COLS
 from nse_predictor.util.datetime import to_ns
 
-FUND_COLS = [
+FUND_META_COLS = [
     "stock_code",
     "report_date",
     "publish_date",
+    "period",
+]
+FUND_CORE_NUMERIC = [
     "eps",
     "dividend",
     "book_value",
-    "period",
+]
+FUND_BANK_NUMERIC = [
+    "pat",
+    "pat_yoy",
+    "roe",
+    "roa",
+    "nim",
+    "cir",
+    "npl",
+    "assets",
+    "loans",
+    "deposits",
+    "nii",
+    "nfi",
+]
+FUND_NUMERIC = FUND_CORE_NUMERIC + FUND_BANK_NUMERIC
+FUND_COLS = FUND_META_COLS[:3] + FUND_CORE_NUMERIC + ["period"] + FUND_BANK_NUMERIC
+JOIN_VALUE_COLS = FUND_NUMERIC + ["eps_yoy"]
+DERIVED_EMPTY = JOIN_VALUE_COLS + [
+    "div_yield_proxy",
+    "book_to_price",
+    "loan_deposit_ratio",
 ]
 MIN_COVERAGE = 0.30
 
@@ -46,10 +69,12 @@ def load_fundamentals(path: Path | None = None) -> pd.DataFrame:
         "ticker": "stock_code",
         "eps_basic": "eps",
         "div": "dividend",
+        "dps": "dividend",
         "bvps": "book_value",
         "book": "book_value",
         "published": "publish_date",
         "as_of": "report_date",
+        "pat_yoy_pct": "pat_yoy",
     }
     df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
     if "stock_code" not in df.columns:
@@ -59,7 +84,7 @@ def load_fundamentals(path: Path | None = None) -> pd.DataFrame:
     for col in ("report_date", "publish_date"):
         df[col] = to_ns(df[col]) if col in df.columns else pd.NaT
     df["asof_date"] = df["publish_date"].fillna(df["report_date"])
-    for c in ("eps", "dividend", "book_value"):
+    for c in FUND_NUMERIC:
         df[c] = pd.to_numeric(df[c], errors="coerce") if c in df.columns else np.nan
     if "period" not in df.columns:
         df["period"] = ""
@@ -69,17 +94,9 @@ def load_fundamentals(path: Path | None = None) -> pd.DataFrame:
 
 def join_fundamentals_asof(prices_panel: pd.DataFrame, fundamentals: pd.DataFrame) -> pd.DataFrame:
     """Vectorized backward merge_asof on asof_date by stock_code (no leakage)."""
-    empty_cols = (
-        "eps",
-        "dividend",
-        "book_value",
-        "eps_yoy",
-        "div_yield_proxy",
-        "book_to_price",
-    )
     if fundamentals is None or fundamentals.empty:
         out = prices_panel.copy()
-        for c in empty_cols:
+        for c in DERIVED_EMPTY:
             out[c] = np.nan
         return out
 
@@ -91,24 +108,20 @@ def join_fundamentals_asof(prices_panel: pd.DataFrame, fundamentals: pd.DataFram
     fund["stock_code"] = fund["stock_code"].astype(str).str.upper()
     fund["asof_date"] = to_ns(fund["asof_date"])
     fund = fund.dropna(subset=["asof_date"]).sort_values(["stock_code", "asof_date"])
+    for c in FUND_NUMERIC:
+        if c not in fund.columns:
+            fund[c] = np.nan
     fund["eps_yoy"] = fund.groupby("stock_code", sort=False)["eps"].pct_change()
 
-    right_cols = ["asof_date", "eps", "dividend", "book_value", "eps_yoy"]
+    right_cols = ["asof_date"] + [c for c in JOIN_VALUE_COLS if c in fund.columns]
     frames: list[pd.DataFrame] = []
-    # Per-ticker asof avoids pandas by= sort edge cases on mixed panels
     fund_by = {c: g for c, g in fund.groupby("stock_code", sort=False)}
+    empty_assign = {c: np.nan for c in JOIN_VALUE_COLS}
     for code, part in left.groupby("stock_code", sort=False):
         p = part.dropna(subset=["trade_date"]).sort_values("trade_date", kind="mergesort")
         f = fund_by.get(code)
         if f is None or f.empty:
-            frames.append(
-                p.assign(
-                    eps=np.nan,
-                    dividend=np.nan,
-                    book_value=np.nan,
-                    eps_yoy=np.nan,
-                )
-            )
+            frames.append(p.assign(**empty_assign))
             continue
         r = (
             f[right_cols]
@@ -118,6 +131,9 @@ def join_fundamentals_asof(prices_panel: pd.DataFrame, fundamentals: pd.DataFram
         )
         frames.append(pd.merge_asof(p, r, on="trade_date", direction="backward"))
     out = pd.concat(frames, ignore_index=True)
+    for c in JOIN_VALUE_COLS:
+        if c not in out.columns:
+            out[c] = np.nan
     price = out["price"] if "price" in out.columns else pd.Series(np.nan, index=out.index)
     out["div_yield_proxy"] = np.where(
         price.notna() & (price > 0) & out["dividend"].notna(),
@@ -127,6 +143,11 @@ def join_fundamentals_asof(prices_panel: pd.DataFrame, fundamentals: pd.DataFram
     out["book_to_price"] = np.where(
         price.notna() & (price > 0) & out["book_value"].notna(),
         out["book_value"] / price,
+        np.nan,
+    )
+    out["loan_deposit_ratio"] = np.where(
+        out["loans"].notna() & out["deposits"].notna() & (out["deposits"] > 0),
+        out["loans"] / out["deposits"],
         np.nan,
     )
     return out

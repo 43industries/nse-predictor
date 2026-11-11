@@ -493,6 +493,50 @@ section[data-testid="stSidebar"] .block-container {{
 .stProgress > div > div > div > div {{
   background-color: {NSE_GREEN_DARK};
 }}
+
+.banks-kpi {{
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 0.35rem 0 0.9rem 0;
+}}
+
+.banks-kpi-card {{
+  background: {WHITE};
+  border: 1px solid #DEDFE0;
+  border-radius: 4px;
+  padding: 0.75rem 0.85rem;
+}}
+
+.banks-kpi-card .k {{
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: {MUTED};
+}}
+
+.banks-kpi-card .v {{
+  font-family: 'Montserrat', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: {NSE_NAVY};
+  margin-top: 0.2rem;
+}}
+
+.banks-kpi-card .s {{
+  font-size: 0.78rem;
+  color: {MUTED};
+  margin-top: 0.15rem;
+}}
+
+.banks-yoy-up {{ color: {UP}; font-weight: 700; }}
+.banks-yoy-down {{ color: {DOWN}; font-weight: 700; }}
+.banks-yoy-flat {{ color: {MUTED}; font-weight: 600; }}
+
+@media (max-width: 900px) {{
+  .banks-kpi {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+}}
 </style>
 """
 
@@ -648,10 +692,14 @@ def load_shap() -> pd.DataFrame:
 
 @st.cache_data
 def load_fundamentals() -> pd.DataFrame:
-    path = settings.data_external_dir / "fundamentals_sample.csv"
-    if path.exists():
-        return pd.read_csv(path)
-    return pd.DataFrame()
+    from nse_predictor.ingest.fundamentals import load_fundamentals as _load_fund
+
+    df = _load_fund()
+    if df.empty:
+        return pd.DataFrame()
+    out = df.copy()
+    out["stock_code"] = out["stock_code"].astype(str).str.strip().str.upper()
+    return out
 
 
 @st.cache_data
@@ -660,6 +708,13 @@ def load_error_history() -> pd.DataFrame:
     if not path.exists():
         return pd.DataFrame()
     return pd.read_parquet(path)
+
+
+@st.cache_data
+def load_model_meta_dash() -> dict:
+    from nse_predictor.training.meta import load_model_meta
+
+    return load_model_meta(settings.models_dir)
 
 
 @st.cache_data
@@ -755,6 +810,9 @@ def hit_rate_map(error_hist: pd.DataFrame, stocks: list[str]) -> dict[str, float
 def select_stock(code: str, prefs: dict, go_detail: bool = True) -> None:
     code = str(code).upper()
     st.session_state["stock"] = code
+    # Applied before sidebar_stock_select is created on the next run (cannot
+    # mutate that widget key after it is instantiated on this run).
+    st.session_state["pending_stock"] = code
     recent = [c for c in prefs.get("recent", []) if c != code]
     recent = [code] + recent
     prefs["recent"] = recent[:8]
@@ -762,6 +820,9 @@ def select_stock(code: str, prefs: dict, go_detail: bool = True) -> None:
     if go_detail:
         prefs["main_tab"] = "Stock detail"
         st.session_state["main_tab"] = "Stock detail"
+        # Applied before the radio is created on the next run (cannot mutate
+        # main_nav_radio after that widget is instantiated on this run).
+        st.session_state["pending_main_tab"] = "Stock detail"
     save_prefs(prefs)
     st.session_state["prefs"] = prefs
 
@@ -1073,20 +1134,16 @@ def render_movers_text_boxes(
                 f'<div class="mover-box"><p class="box-title">{title}</p>{body}</div>',
                 unsafe_allow_html=True,
             )
-            options = [str(c) for c in board["stock_code"].tolist()]
-            if options:
-                pick = st.selectbox(
-                    f"Open from {title.lower()}",
-                    options,
-                    key=f"{key_prefix}_sel",
-                    label_visibility="collapsed",
-                )
+            for _, r in board.iterrows():
+                code = str(r["stock_code"])
+                ret = float(r["ret_1d"])
+                label = f"{code}  {ret:+.1%}"
                 if st.button(
-                    f"Open {pick}",
-                    key=f"{key_prefix}_go",
+                    label,
+                    key=f"{key_prefix}_open_{code}",
                     use_container_width=True,
                 ):
-                    select_stock(pick, prefs, go_detail=True)
+                    select_stock(code, prefs, go_detail=True)
                     st.rerun()
 
 
@@ -1380,6 +1437,450 @@ def render_jump_nav() -> str | None:
     return st.session_state.get("detail_section") or chosen
 
 
+def _latest_fund_row(fundamentals: pd.DataFrame, stock: str) -> pd.Series | None:
+    if fundamentals is None or fundamentals.empty:
+        return None
+    hit = fundamentals[fundamentals["stock_code"].astype(str).str.upper() == stock.upper()].copy()
+    if hit.empty:
+        return None
+    asof_col = "asof_date" if "asof_date" in hit.columns else "publish_date"
+    if asof_col in hit.columns:
+        hit = hit.assign(_asof=pd.to_datetime(hit[asof_col], errors="coerce")).sort_values("_asof")
+    return hit.iloc[-1]
+
+
+def _pct_or_dash(val) -> str:
+    try:
+        v = float(val)
+    except (TypeError, ValueError):
+        return "—"
+    if v != v:
+        return "—"
+    return f"{v:.1f}%"
+
+
+def render_bank_fundamentals_strip(stock: str, fundamentals: pd.DataFrame) -> None:
+    """Compact as-of bank metrics next to forecast overview (decision support)."""
+    from nse_predictor.ingest.banks import BANK_NAMES, BANK_TICKERS, is_bank
+
+    if not is_bank(stock):
+        return
+    row = _latest_fund_row(fundamentals, stock)
+    if row is None:
+        st.caption(f"No bank fundamentals on file for {stock}.")
+        return
+    name = BANK_NAMES.get(stock.upper(), stock.upper())
+    asof = row.get("asof_date") if "asof_date" in row.index else row.get("publish_date")
+    if asof is None or (isinstance(asof, float) and asof != asof):
+        asof = row.get("report_date")
+    asof_s = str(pd.to_datetime(asof).date()) if pd.notna(asof) else "—"
+    period = str(row.get("period") or "")
+    st.markdown(
+        f'<p class="section-label">Bank fundamentals (as-of {asof_s}'
+        f'{f" · {period}" if period and period != "nan" else ""}) — {name}</p>',
+        unsafe_allow_html=True,
+    )
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("PAT YoY", _pct_or_dash(row.get("pat_yoy")))
+    m2.metric("ROE", _pct_or_dash(row.get("roe")))
+    m3.metric("ROA", _pct_or_dash(row.get("roa")))
+    m4.metric("NIM", _pct_or_dash(row.get("nim")))
+    n1, n2, n3, n4 = st.columns(4)
+    n1.metric("CIR", _pct_or_dash(row.get("cir")))
+    n2.metric("NPL", _pct_or_dash(row.get("npl")))
+    n3.metric("EPS", _fmt_num(row.get("eps"), ".2f"))
+    n4.metric("DPS", _fmt_num(row.get("dividend"), ".2f"))
+
+    peers = fundamentals[
+        fundamentals["stock_code"].astype(str).str.upper().isin(BANK_TICKERS)
+        & fundamentals["roe"].notna()
+    ].copy()
+    if not peers.empty and pd.notna(row.get("roe")):
+        asof_col = "asof_date" if "asof_date" in peers.columns else "publish_date"
+        peers["_asof"] = pd.to_datetime(peers[asof_col], errors="coerce")
+        latest_peers = peers.sort_values("_asof").groupby("stock_code", as_index=False).tail(1)
+        med_roe = float(latest_peers["roe"].median())
+        delta = float(row["roe"]) - med_roe
+        direction = "above" if delta >= 0 else "below"
+        st.caption(
+            f"ROE is {abs(delta):.1f} pp {direction} the latest bank-peer median "
+            f"({med_roe:.1f}%). Research context only — not investment advice."
+        )
+
+
+def _bank_fy_panel(fundamentals: pd.DataFrame) -> pd.DataFrame:
+    """One latest FY row per bank ticker (prefer FY2025, else newest publish_date)."""
+    from nse_predictor.ingest.banks import BANK_NAMES, BANK_TICKERS
+
+    if fundamentals is None or fundamentals.empty:
+        return pd.DataFrame()
+    hit = fundamentals[
+        fundamentals["stock_code"].astype(str).str.upper().isin(BANK_TICKERS)
+    ].copy()
+    if hit.empty:
+        return pd.DataFrame()
+    hit["stock_code"] = hit["stock_code"].astype(str).str.upper()
+    hit["_pub"] = pd.to_datetime(
+        hit["publish_date"] if "publish_date" in hit.columns else hit.get("report_date"),
+        errors="coerce",
+    )
+    fy = hit[hit["period"].astype(str).str.upper().str.startswith("FY")].copy()
+    if fy.empty:
+        fy = hit
+    # Prefer FY2025 when present, else latest FY by publish date.
+    fy["_fy_rank"] = fy["period"].astype(str).str.upper().eq("FY2025").astype(int)
+    fy = fy.sort_values(["stock_code", "_fy_rank", "_pub"], ascending=[True, False, False])
+    latest = fy.groupby("stock_code", as_index=False).head(1).copy()
+    latest["bank_name"] = latest["stock_code"].map(BANK_NAMES).fillna(latest["stock_code"])
+    return latest.reset_index(drop=True)
+
+
+def _fmt_bn(val) -> str:
+    try:
+        v = float(val)
+    except (TypeError, ValueError):
+        return "—"
+    if v != v:
+        return "—"
+    if abs(v) >= 100:
+        return f"{v:.0f}"
+    return f"{v:.1f}"
+
+
+def render_desk_brief(
+    forecasts: pd.DataFrame,
+    evaluation: dict,
+    error_hist: pd.DataFrame,
+    fundamentals: pd.DataFrame,
+    prefs: dict,
+    model_meta: dict | None = None,
+) -> None:
+    """Today's companion brief: setups, skips, paper journal."""
+    from nse_predictor.companion.desk_brief import build_desk_brief
+    from nse_predictor.companion.paper_journal import append_entry, load_journal
+
+    st.markdown('<p class="section-label">Desk brief — today\'s companion</p>', unsafe_allow_html=True)
+    st.caption(
+        "Research trading companion only — not an order ticket, not investment advice, "
+        "not affiliated with the NSE. You decide."
+    )
+
+    brief = build_desk_brief(
+        forecasts,
+        evaluation=evaluation,
+        error_hist=error_hist,
+        model_meta=model_meta,
+        top_n=5,
+    )
+    setups = brief.get("setups") or []
+    skips = brief.get("skips") or []
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("As of", brief.get("as_of") or "—")
+    k2.metric("Setups", int(brief.get("n_setups") or 0))
+    k3.metric("Skips", int(brief.get("n_skips") or 0))
+    k4.metric("Model thr", f"{float(brief.get('threshold') or 0.5):.2f}")
+
+    st.markdown('<p class="section-label">Today\'s setups</p>', unsafe_allow_html=True)
+    if not setups:
+        st.info("No actionable up-setups after excluding at-chance / low-conviction names.")
+    else:
+        table = pd.DataFrame(setups)
+        show_cols = [
+            c
+            for c in [
+                "stock_code",
+                "price",
+                "pred_label",
+                "prob_up",
+                "ret5d_lo",
+                "ret5d_hi",
+                "vol20d",
+                "hit_rate",
+            ]
+            if c in table.columns
+        ]
+        display = table[show_cols].copy()
+        if "prob_up" in display.columns:
+            display["prob_up"] = display["prob_up"].map(
+                lambda x: f"{float(x):.0%}" if x == x and x is not None else "—"
+            )
+        if "hit_rate" in display.columns:
+            display["hit_rate"] = display["hit_rate"].map(
+                lambda x: f"{float(x):.0%}" if x == x and x is not None else "—"
+            )
+        for col in ("ret5d_lo", "ret5d_hi", "vol20d"):
+            if col in display.columns:
+                display[col] = display[col].map(
+                    lambda x: f"{float(x):.1%}" if x == x and x is not None else "—"
+                )
+        st.dataframe(display, use_container_width=True, hide_index=True)
+
+        note = st.text_input(
+            "Journal note (optional)",
+            value="",
+            key="desk_brief_note",
+            placeholder="Why you would take or skip this setup",
+        )
+        for row in setups:
+            code = str(row["stock_code"])
+            c1, c2, c3, c4 = st.columns([2, 1, 1, 1])
+            with c1:
+                prob_s = (
+                    f"{float(row['prob_up']):.0%}"
+                    if row.get("prob_up") is not None
+                    else "—"
+                )
+                st.markdown(
+                    f"{logo_html(code)} **{code}** · P(up) {prob_s}",
+                    unsafe_allow_html=True,
+                )
+            if c2.button("Open", key=f"desk_open_{code}", use_container_width=True):
+                select_stock(code, prefs, go_detail=True)
+                st.rerun()
+            if c3.button("Log long", key=f"desk_long_{code}", use_container_width=True):
+                append_entry(
+                    stock_code=code,
+                    stance="long",
+                    as_of_date=brief.get("as_of"),
+                    prob_up=row.get("prob_up"),
+                    pred_label=row.get("pred_label"),
+                    price=row.get("price"),
+                    note=note,
+                    source="desk_brief",
+                )
+                st.success(f"Logged long {code}")
+                st.rerun()
+            if c4.button("Log skip", key=f"desk_skip_{code}", use_container_width=True):
+                append_entry(
+                    stock_code=code,
+                    stance="skip",
+                    as_of_date=brief.get("as_of"),
+                    prob_up=row.get("prob_up"),
+                    pred_label=row.get("pred_label"),
+                    price=row.get("price"),
+                    note=note,
+                    source="desk_brief",
+                )
+                st.success(f"Logged skip {code}")
+                st.rerun()
+
+        codes = [str(r["stock_code"]) for r in setups]
+        pick = st.selectbox(
+            "One-name brief",
+            codes,
+            key="desk_brief_pick",
+        )
+        row = next((r for r in setups if r["stock_code"] == pick), None)
+        if row:
+            with st.expander(f"Brief — {pick}", expanded=True):
+                st.markdown(
+                    f'<div class="detail-title">{logo_html(pick, large=True)}'
+                    f"<div><h3>{pick}</h3>"
+                    f'<span class="co-name">{company_display_name(pick)}</span></div></div>',
+                    unsafe_allow_html=True,
+                )
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("Stance", str(row.get("pred_label") or "—").upper())
+                m2.metric(
+                    "P(up)",
+                    f"{float(row['prob_up']):.0%}" if row.get("prob_up") is not None else "—",
+                )
+                lo, hi = row.get("ret5d_lo"), row.get("ret5d_hi")
+                band = (
+                    f"{float(lo):+.1%} … {float(hi):+.1%}"
+                    if lo is not None and hi is not None
+                    else "—"
+                )
+                m3.metric("5d range", band)
+                m4.metric(
+                    "Hit rate",
+                    f"{float(row['hit_rate']):.0%}" if row.get("hit_rate") is not None else "—",
+                )
+                render_bank_fundamentals_strip(pick, fundamentals)
+                st.caption(brief.get("disclaimer") or DISCLAIMER)
+
+    skip_chance = [
+        s["stock_code"]
+        for s in skips
+        if (s.get("skip_reason") or "") in ("at_chance", "thin_n")
+    ]
+    if skip_chance:
+        st.caption(f"Skip / at-chance today: {', '.join(skip_chance)}")
+    other_skips = [
+        f"{s['stock_code']} ({s.get('skip_reason')})"
+        for s in skips
+        if (s.get("skip_reason") or "") not in ("at_chance", "thin_n")
+    ]
+    if other_skips:
+        with st.expander("Other skips (flat / low conviction)", expanded=False):
+            st.write(", ".join(other_skips))
+
+    st.markdown('<p class="section-label">Paper journal</p>', unsafe_allow_html=True)
+    journal = load_journal()
+    if journal.empty:
+        st.caption("No paper entries yet. Use Log long / Log skip on a setup.")
+    else:
+        show_j = journal.sort_values("logged_at", ascending=False).head(30)
+        st.dataframe(show_j, use_container_width=True, hide_index=True)
+    st.caption(brief.get("disclaimer") or DISCLAIMER)
+
+
+def render_banks_comparison(
+    fundamentals: pd.DataFrame,
+    forecasts: pd.DataFrame,
+    prefs: dict,
+) -> None:
+    """Sector-style FY comparison table for listed banks (decision support)."""
+    from nse_predictor.ingest.banks import BANK_TICKERS
+
+    st.markdown(
+        '<p class="section-label">Kenya listed banks — FY comparison</p>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Curated decision-support table (KES billions unless stated). "
+        "Primary source kenyanbanks.com FY2025; NPL/HFCK gaps filled from Cytonn/ApexHub. "
+        "Not affiliated with kenyanbanks.com. Not investment advice."
+    )
+
+    panel = _bank_fy_panel(fundamentals)
+    if panel.empty:
+        st.warning("No bank fundamentals on file. Run scripts/_seed_bank_fundamentals.py.")
+        return
+
+    confirmed = panel[panel["roe"].notna() | panel["pat"].notna()]
+    n_banks = int(panel["stock_code"].nunique())
+    n_confirmed = int(confirmed["stock_code"].nunique())
+    total_assets = float(panel["assets"].dropna().sum()) if "assets" in panel.columns else float("nan")
+    avg_roe = float(panel["roe"].dropna().mean()) if "roe" in panel.columns else float("nan")
+    avg_nim = float(panel["nim"].dropna().mean()) if "nim" in panel.columns else float("nan")
+    best_roe_row = panel.dropna(subset=["roe"]).sort_values("roe", ascending=False).head(1)
+    best_npl_row = panel.dropna(subset=["npl"]).sort_values("npl", ascending=True).head(1)
+    best_roe_s = (
+        f"{best_roe_row.iloc[0]['stock_code']} {best_roe_row.iloc[0]['roe']:.1f}%"
+        if len(best_roe_row)
+        else "—"
+    )
+    best_npl_s = (
+        f"{best_npl_row.iloc[0]['stock_code']} {best_npl_row.iloc[0]['npl']:.1f}%"
+        if len(best_npl_row)
+        else "—"
+    )
+
+    st.markdown(
+        f"""
+        <div class="banks-kpi">
+          <div class="banks-kpi-card">
+            <div class="k">Banks tracked</div>
+            <div class="v">{n_banks}</div>
+            <div class="s">{n_confirmed} with FY metrics</div>
+          </div>
+          <div class="banks-kpi-card">
+            <div class="k">Total assets</div>
+            <div class="v">{_fmt_bn(total_assets)}</div>
+            <div class="s">KES bn (reported)</div>
+          </div>
+          <div class="banks-kpi-card">
+            <div class="k">Avg ROE</div>
+            <div class="v">{_pct_or_dash(avg_roe)}</div>
+            <div class="s">Best: {best_roe_s}</div>
+          </div>
+          <div class="banks-kpi-card">
+            <div class="k">Avg NIM</div>
+            <div class="v">{_pct_or_dash(avg_nim)}</div>
+            <div class="s">Best NPL: {best_npl_s}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    fc = forecasts.copy() if forecasts is not None and not forecasts.empty else pd.DataFrame()
+    if not fc.empty:
+        fc["stock_code"] = fc["stock_code"].astype(str).str.upper()
+        fc = fc[fc["stock_code"].isin(BANK_TICKERS)]
+        keep = [c for c in ["stock_code", "prob_up", "pred_label"] if c in fc.columns]
+        fc = fc[keep].drop_duplicates("stock_code") if keep else pd.DataFrame()
+    else:
+        fc = pd.DataFrame()
+
+    table = panel.merge(fc, on="stock_code", how="left")
+    if "pat" in table.columns:
+        table = table.sort_values("pat", ascending=False, na_position="last")
+    else:
+        table = table.sort_values("stock_code")
+
+    display_rows: list[dict] = []
+    for _, r in table.iterrows():
+        code = str(r["stock_code"])
+        yoy = r.get("pat_yoy")
+        try:
+            yoy_f = float(yoy)
+            yoy_s = f"{yoy_f:+.1f}%" if yoy_f == yoy_f else "—"
+        except (TypeError, ValueError):
+            yoy_s = "—"
+        prob = r.get("prob_up")
+        try:
+            prob_s = f"{float(prob):.0%}" if prob == prob and prob is not None else "—"
+        except (TypeError, ValueError):
+            prob_s = "—"
+        pred = str(r.get("pred_label") or "—")
+        if pred.lower() in ("nan", "none"):
+            pred = "—"
+        display_rows.append(
+            {
+                "Bank": f"{r.get('bank_name', code)} ({code})",
+                "Assets": _fmt_bn(r.get("assets")),
+                "Loans": _fmt_bn(r.get("loans")),
+                "Deposits": _fmt_bn(r.get("deposits")),
+                "NII": _fmt_bn(r.get("nii")),
+                "NFI": _fmt_bn(r.get("nfi")),
+                "PAT": _fmt_bn(r.get("pat")),
+                "PAT YoY%": yoy_s,
+                "ROE%": _pct_or_dash(r.get("roe")).replace("%", ""),
+                "ROA%": _pct_or_dash(r.get("roa")).replace("%", ""),
+                "NIM%": _pct_or_dash(r.get("nim")).replace("%", ""),
+                "CIR%": _pct_or_dash(r.get("cir")).replace("%", ""),
+                "NPL%": _pct_or_dash(r.get("npl")).replace("%", ""),
+                "EPS": _fmt_num(r.get("eps"), ".2f"),
+                "DPS": _fmt_num(r.get("dividend"), ".2f"),
+                "Signal": pred,
+                "P(up)": prob_s,
+            }
+        )
+
+    show = pd.DataFrame(display_rows)
+
+    def _style_yoy(col: pd.Series):
+        styles = []
+        for raw in col.astype(str):
+            if raw.startswith("+"):
+                styles.append(f"color: {UP}; font-weight: 700")
+            elif raw.startswith("-") and raw not in ("—", "-"):
+                styles.append(f"color: {DOWN}; font-weight: 700")
+            else:
+                styles.append("")
+        return styles
+
+    styler = show.style.apply(_style_yoy, subset=["PAT YoY%"])
+    st.dataframe(styler, use_container_width=True, hide_index=True, height=420)
+
+    st.markdown('<p class="section-label">Open bank detail</p>', unsafe_allow_html=True)
+    codes = table["stock_code"].tolist()
+    cols = st.columns(min(5, max(1, len(codes))))
+    for i, code in enumerate(codes):
+        with cols[i % len(cols)]:
+            st.markdown(
+                f'<div style="text-align:center;margin-bottom:0.2rem">{logo_html(code)}</div>',
+                unsafe_allow_html=True,
+            )
+            label = f"{code}"
+            if st.button(label, key=f"bank_open_{code}", use_container_width=True):
+                select_stock(code, prefs, go_detail=True)
+                st.rerun()
+
+
 def render_stock_detail(
     stock: str,
     forecasts: pd.DataFrame,
@@ -1452,6 +1953,8 @@ def render_stock_detail(
         else:
             band = "—"
         c4.metric("5d excess range", band)
+
+        render_bank_fundamentals_strip(stock, fundamentals)
 
         favs = list(prefs.get("favourites") or [])
         is_fav = stock in favs
@@ -1586,6 +2089,7 @@ def render_model_health(evaluation: dict, monitor: dict | None = None, mon_hist:
             ar = (evaluation.get("models") or {}).get("lightgbm_direction", {}).get("abstain_rate")
 
         st.markdown('<p class="section-label">Validation scorecard</p>', unsafe_allow_html=True)
+        ric_b = diag.get("rank_ic_bootstrap") or {}
         cols = st.columns(6)
         cols[0].metric("Status", str(gates.get("status") or "—").upper())
         cols[1].metric("Test Rank IC", _fmt_num(ric.get("mean_ic")))
@@ -1604,29 +2108,52 @@ def render_model_health(evaluation: dict, monitor: dict | None = None, mon_hist:
             )
 
         if ric.get("n_days"):
-            st.caption(
-                f"Test Rank IC (prob vs excess return): mean **{ric.get('mean_ic', float('nan')):.3f}** "
-                f"over {ric.get('n_days')} days."
-            )
+            ci_lo, ci_hi = ric_b.get("ci_low"), ric_b.get("ci_high")
+            if isinstance(ci_lo, (int, float)) and isinstance(ci_hi, (int, float)) and ci_lo == ci_lo and ci_hi == ci_hi:
+                st.caption(
+                    f"Test Rank IC (prob vs excess return): mean **{ric.get('mean_ic', float('nan')):.3f}** "
+                    f"95% bootstrap CI **[{ci_lo:.3f}, {ci_hi:.3f}]** "
+                    f"over {ric.get('n_days')} days."
+                )
+            else:
+                st.caption(
+                    f"Test Rank IC (prob vs excess return): mean **{ric.get('mean_ic', float('nan')):.3f}** "
+                    f"over {ric.get('n_days')} days."
+                )
+        at_chance = diag.get("at_chance_stocks") or [
+            r.get("stock_code")
+            for r in (diag.get("per_stock") or [])
+            if r.get("flag") == "at_chance"
+        ]
+        if at_chance:
+            st.caption(f"At-chance names (near base-rate accuracy): {', '.join(str(c) for c in at_chance)}")
         sel = evaluation.get("selection") or {}
         if sel:
             st.markdown('<p class="section-label">Validation selection</p>', unsafe_allow_html=True)
-            c1, c2, c3 = st.columns(3)
+            c1, c2, c3, c4 = st.columns(4)
             c1.metric("Direction threshold", f"{float(sel.get('threshold', 0.5)):.2f}")
-            c2.metric("Calibration", str(sel.get("calibration") or "none"))
+            c2.metric("Decision metric", str(sel.get("decision_metric") or "—"))
+            c3.metric("Calibration", str(sel.get("calibration") or sel.get("calibration_status") or "none"))
             rq = sel.get("return_quantiles") or {}
             if rq:
-                c3.metric(
+                c4.metric(
                     "Return band (residual q)",
                     f"{float(rq.get('q_low', 0)):.1%} … {float(rq.get('q_high', 0)):.1%}",
                 )
+            vu = sel.get("valid_utility")
             vm = sel.get("valid_direction") or {}
+            bits = []
+            if isinstance(vu, (int, float)) and vu == vu:
+                bits.append(f"valid utility {vu:.1%}")
             if vm:
-                st.caption(
-                    f"Valid accuracy {vm.get('accuracy', 0):.1%} · "
-                    f"lift vs always-up {vm.get('lift_vs_always_up', 0):+.1%} · "
-                    f"scale_pos_weight {float(sel.get('scale_pos_weight') or 1):.2f}"
+                bits.append(
+                    f"valid accuracy {vm.get('accuracy', 0):.1%} · "
+                    f"lift vs always-up {vm.get('lift_vs_always_up', 0):+.1%}"
                 )
+            if rq.get("vol_scaled"):
+                bits.append(f"vol-scaled bands (ref={float(rq.get('vol_scale_ref') or 0):.4f})")
+            if bits:
+                st.caption(" · ".join(bits))
         st.plotly_chart(build_baseline_figure(evaluation), width="stretch")
         wf = evaluation.get("walk_forward", [])
         if wf:
@@ -1738,6 +2265,7 @@ def main() -> None:
     fundamentals = load_fundamentals()
     error_hist = load_error_history()
     news = load_news()
+    model_meta = load_model_meta_dash()
 
     if forecasts.empty:
         st.markdown(
@@ -1765,6 +2293,12 @@ def main() -> None:
             st.session_state["stock"] = "SCOM"
         else:
             st.session_state["stock"] = stocks[0]
+
+    # Honor programmatic stock picks before instantiating sidebar_stock_select.
+    pending_stock = st.session_state.pop("pending_stock", None)
+    if pending_stock in stocks:
+        st.session_state["stock"] = pending_stock
+        st.session_state["sidebar_stock_select"] = pending_stock
 
     # --- Sidebar: personalization & nav ---
     st.sidebar.markdown("### Your desk")
@@ -1850,9 +2384,14 @@ def main() -> None:
         else 0,
         key="sidebar_stock_select",
     )
+    # Manual sidebar changes only — do not fight pending_stock / button picks.
     if stock != st.session_state.get("stock"):
-        select_stock(stock, prefs, go_detail=False)
         st.session_state["stock"] = stock
+        prefs["last_stock"] = stock
+        recent = [c for c in prefs.get("recent", []) if c != stock]
+        prefs["recent"] = [stock] + recent[:7]
+        save_prefs(prefs)
+        st.session_state["prefs"] = prefs
 
     with st.sidebar.expander("How to read this", expanded=False):
         st.write(
@@ -1912,10 +2451,20 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    tab_labels = ["My market", "Stock detail", "Model health"]
+    tab_labels = ["My market", "Desk brief", "Stock detail", "Banks", "Model health"]
     default_tab = prefs.get("main_tab") if prefs.get("main_tab") in tab_labels else "My market"
     if "main_tab" not in st.session_state:
         st.session_state["main_tab"] = default_tab
+    if st.session_state.get("main_tab") not in tab_labels:
+        st.session_state["main_tab"] = "My market"
+
+    # Honor programmatic tab switches before instantiating the radio widget.
+    pending = st.session_state.pop("pending_main_tab", None)
+    if pending in tab_labels:
+        st.session_state["main_tab"] = pending
+        st.session_state["main_nav_radio"] = pending
+        prefs["main_tab"] = pending
+        save_prefs(prefs)
 
     # Streamlit tabs don't support controlled index easily; use radio as primary nav
     nav = st.radio(
@@ -1966,6 +2515,16 @@ def main() -> None:
         render_market_overview(prices, prefs, focus_codes=overview_focus)
         render_signal_cards(filtered, prices, hits, prefs, active=stock)
 
+    elif nav == "Desk brief":
+        render_desk_brief(
+            forecasts,
+            evaluation,
+            error_hist,
+            fundamentals,
+            prefs,
+            model_meta=model_meta,
+        )
+
     elif nav == "Stock detail":
         st.markdown(
             f'<div class="detail-title">{logo_html(stock, large=True)}'
@@ -1983,6 +2542,9 @@ def main() -> None:
             news,
             prefs,
         )
+
+    elif nav == "Banks":
+        render_banks_comparison(fundamentals, forecasts, prefs)
 
     else:
         render_model_health(evaluation, monitor=monitor, mon_hist=mon_hist)

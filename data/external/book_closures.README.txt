@@ -1,0 +1,13 @@
+book_closures.csv — dividend book-closure / ex-div calendar
+
+Columns:
+  stock_code          NSE ticker
+  announce_date       When the corporate action was knowable (leakage cut)
+  book_closure_date   Book closure date
+  ex_date             Ex-dividend date (optional)
+
+Features (features/build.py):
+  near_book_closure       1 if announce_date ≤ trade_date ≤ book_closure_date
+  days_since_book_closure days since last closure (NaN before first event)
+
+Replace sample rows with official NSE announcements for production use.

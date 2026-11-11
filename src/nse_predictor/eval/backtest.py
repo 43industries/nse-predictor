@@ -59,6 +59,41 @@ def simulate_long_flat(
     }
 
 
+def threshold_utility(
+    prices: pd.DataFrame,
+    panel: pd.DataFrame,
+    probs: np.ndarray,
+    thr: float,
+    abstain_band: float = 0.05,
+    cost_bps: float = 50.0,
+) -> float:
+    """Costed equal-weight long/flat book return for a probability threshold.
+
+    Returns total_return of the book, or NaN if unscorable.
+    """
+    from nse_predictor.models.tabular import labels_from_proba
+
+    if prices is None or panel is None or panel.empty or "price" not in prices.columns:
+        return float("nan")
+    labels = labels_from_proba(
+        np.asarray(probs, dtype=float),
+        threshold=float(thr),
+        abstain_band=float(abstain_band),
+        mode="threshold",
+        trade_dates=panel["trade_date"],
+    )
+    signals = panel[["trade_date", "stock_code"]].copy()
+    signals["pred_label"] = labels
+    px = prices[["trade_date", "stock_code", "price"]].copy()
+    bt = simulate_book_long_flat(px, signals, cost_bps=cost_bps)
+    if not bt.get("ok"):
+        return float("nan")
+    try:
+        return float(bt["total_return"])
+    except (TypeError, ValueError, KeyError):
+        return float("nan")
+
+
 def simulate_book_long_flat(
     prices: pd.DataFrame,
     signals: pd.DataFrame,

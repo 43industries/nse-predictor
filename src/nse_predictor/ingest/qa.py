@@ -222,6 +222,116 @@ def check_sector_coverage(sectors: pd.DataFrame, investable: list[str]) -> dict:
     }
 
 
+def check_fundamentals_qa(investable: list[str]) -> dict:
+    """Coverage and sanity checks for curated fundamentals / bank metrics."""
+    from nse_predictor.ingest.banks import BANK_TICKERS
+    from nse_predictor.ingest.fundamentals import (
+        FUND_BANK_NUMERIC,
+        load_fundamentals,
+        resolve_fundamentals_path,
+    )
+
+    path = resolve_fundamentals_path()
+    fund = load_fundamentals()
+    if fund.empty:
+        return {
+            "ok": False,
+            "path": str(path) if path else None,
+            "n_rows": 0,
+            "coverage_any": 0.0,
+            "coverage_bank_metrics": 0.0,
+            "missing_publish_date": [],
+            "banks_missing_roe": sorted(BANK_TICKERS),
+            "banks_missing_npl": sorted(BANK_TICKERS),
+            "eps_outliers": [],
+            "notes": ["fundamentals.csv missing or empty"],
+        }
+
+    inv = {str(c).upper() for c in investable}
+    codes = fund["stock_code"].astype(str).str.upper()
+    covered = codes.isin(inv)
+    any_cov = float(codes[covered].nunique() / max(len(inv), 1)) if inv else 0.0
+
+    bank_cols = [c for c in ("roe", "roa", "nim", "pat_yoy") if c in fund.columns]
+    bank_rows = fund[codes.isin(BANK_TICKERS)].copy()
+    if bank_cols and not bank_rows.empty:
+        bank_hit = bank_rows.assign(_code=bank_rows["stock_code"].astype(str).str.upper())
+        with_metrics = (
+            bank_hit.groupby("_code")[bank_cols]
+            .apply(lambda g: bool(g.notna().any().any()))
+            .sum()
+        )
+        bank_metric_cov = float(with_metrics / max(len(BANK_TICKERS), 1))
+    else:
+        bank_metric_cov = 0.0
+
+    missing_pub = (
+        fund.loc[fund["publish_date"].isna(), "stock_code"].astype(str).str.upper().unique().tolist()
+        if "publish_date" in fund.columns
+        else []
+    )
+
+    latest_bank = (
+        bank_rows.sort_values("asof_date")
+        .groupby(bank_rows["stock_code"].astype(str).str.upper(), as_index=False)
+        .tail(1)
+        if not bank_rows.empty
+        else pd.DataFrame()
+    )
+    banks_missing_roe = sorted(
+        c
+        for c in BANK_TICKERS
+        if latest_bank.empty
+        or c not in set(latest_bank["stock_code"].astype(str).str.upper())
+        or latest_bank.loc[
+            latest_bank["stock_code"].astype(str).str.upper() == c, "roe"
+        ]
+        .isna()
+        .all()
+    )
+    banks_missing_npl = sorted(
+        c
+        for c in BANK_TICKERS
+        if latest_bank.empty
+        or c not in set(latest_bank["stock_code"].astype(str).str.upper())
+        or latest_bank.loc[
+            latest_bank["stock_code"].astype(str).str.upper() == c, "npl"
+        ]
+        .isna()
+        .all()
+    )
+
+    eps_outliers: list[dict] = []
+    if "eps" in fund.columns:
+        for r in fund.itertuples(index=False):
+            eps = getattr(r, "eps", None)
+            if eps is None or (isinstance(eps, float) and np.isnan(eps)):
+                continue
+            if abs(float(eps)) > 100:
+                eps_outliers.append(
+                    {
+                        "stock_code": str(getattr(r, "stock_code")),
+                        "period": str(getattr(r, "period", "")),
+                        "eps": float(eps),
+                    }
+                )
+
+    return {
+        "ok": any_cov >= 0.5 and bool(path),
+        "path": str(path) if path else None,
+        "n_rows": int(len(fund)),
+        "n_tickers": int(codes.nunique()),
+        "coverage_any": any_cov,
+        "coverage_bank_metrics": bank_metric_cov,
+        "missing_publish_date": sorted(missing_pub)[:40],
+        "banks_missing_roe": banks_missing_roe,
+        "banks_missing_npl": banks_missing_npl,
+        "bank_numeric_cols": FUND_BANK_NUMERIC,
+        "eps_outliers": eps_outliers[:20],
+        "notes": [],
+    }
+
+
 def run_price_qa(
     prices: pd.DataFrame | None = None,
     macro: pd.DataFrame | None = None,
@@ -254,6 +364,7 @@ def run_price_qa(
         "macro": validate_macro(macro if macro is not None else empty, macro_source),
         "macro_asof": check_macro_asof_leak(prices, macro if macro is not None else empty),
         "sectors": check_sector_coverage(sectors if sectors is not None else empty, investable),
+        "fundamentals": check_fundamentals_qa(investable),
     }
     if str(macro_source).startswith("synthetic"):
         report["macro"]["banner"] = "SYNTHETIC MACRO — not official CBK/KNBS"
@@ -326,5 +437,43 @@ def write_qa_reports(report: dict, reports_dir: Path | None = None) -> tuple[Pat
         f"- orphans: {', '.join(report['sectors'].get('orphans') or []) or 'none'}",
         "",
     ]
+    fund = report.get("fundamentals") or {}
+    if fund:
+        lines += [
+            "## Fundamentals",
+            f"- path: `{fund.get('path')}`",
+            f"- rows / tickers: **{fund.get('n_rows')}** / **{fund.get('n_tickers')}**",
+            f"- investable coverage (any fundamentals): **{fund.get('coverage_any', 0):.0%}**",
+            f"- bank metric coverage (ROE/ROA/NIM/PAT YoY): **{fund.get('coverage_bank_metrics', 0):.0%}**",
+            f"- missing publish_date tickers: "
+            + (", ".join(fund.get("missing_publish_date") or []) or "none"),
+            f"- banks missing latest ROE: "
+            + (", ".join(fund.get("banks_missing_roe") or []) or "none"),
+            f"- banks missing latest NPL: "
+            + (", ".join(fund.get("banks_missing_npl") or []) or "none"),
+            f"- |eps| > 100 outliers: **{len(fund.get('eps_outliers') or [])}**",
+            "",
+        ]
     md_path.write_text("\n".join(lines), encoding="utf-8")
+
+    # Focused fundamentals QA sidecar for bank upgrade audits
+    fund_md = reports_dir / "fundamentals_qa.md"
+    if fund:
+        fund_lines = [
+            "# Fundamentals QA",
+            "",
+            f"Source: `{fund.get('path')}`",
+            "",
+            f"- rows: {fund.get('n_rows')}",
+            f"- tickers: {fund.get('n_tickers')}",
+            f"- investable coverage: {fund.get('coverage_any', 0):.1%}",
+            f"- bank metrics coverage: {fund.get('coverage_bank_metrics', 0):.1%}",
+            f"- banks missing ROE: {', '.join(fund.get('banks_missing_roe') or []) or 'none'}",
+            f"- banks missing NPL: {', '.join(fund.get('banks_missing_npl') or []) or 'none'}",
+            "",
+            "Curated bank FY seed from kenyanbanks.com (no scrape). "
+            "HFCK may lack FY2025 ROE/NPL when results were pending.",
+            "",
+        ]
+        fund_md.write_text("\n".join(fund_lines), encoding="utf-8")
     return json_path, md_path

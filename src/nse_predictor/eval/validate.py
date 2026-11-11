@@ -114,12 +114,19 @@ def direction_diagnostics(eval_df: pd.DataFrame, dir_pred: pd.DataFrame) -> dict
     return out
 
 
-def eval_return_model(eval_df: pd.DataFrame, ret_model) -> dict:
+def eval_return_model(
+    eval_df: pd.DataFrame,
+    ret_model,
+    vol: np.ndarray | None = None,
+) -> dict:
     tgt = ret_model.target_col
     ev = eval_df.dropna(subset=[tgt])
     if ev.empty:
         return {}
-    rp = ret_model.predict(ev)
+    vol_use = vol
+    if vol_use is None and "vol_20" in ev.columns and getattr(ret_model, "vol_scaled_", False):
+        vol_use = ev["vol_20"].astype(float).values
+    rp = ret_model.predict(ev, vol=vol_use)
     ric = ev.merge(
         rp[["trade_date", "stock_code", "pred_value"]],
         on=["trade_date", "stock_code"],

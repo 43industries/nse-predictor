@@ -24,7 +24,12 @@ from nse_predictor.eval.diagnostics import (
 )
 from nse_predictor.eval.error_history import build_error_history
 from nse_predictor.eval.gates import compute_validation_gates
-from nse_predictor.eval.metrics import majority_baseline_pred, rank_ic, regression_metrics
+from nse_predictor.eval.metrics import (
+    majority_baseline_pred,
+    rank_ic,
+    rank_ic_bootstrap,
+    regression_metrics,
+)
 from nse_predictor.eval.protocol import LABEL_HORIZON_DAYS, time_split_embargoed
 from nse_predictor.eval.validate import (
     direction_diagnostics,
@@ -39,7 +44,8 @@ from nse_predictor.features.ablation import select_feature_preset, write_ablatio
 from nse_predictor.features.build import DEAD_ZONE_XS
 from nse_predictor.features.cache import load_macro_source, load_or_build_features
 from nse_predictor.ingest.fundamentals import load_fundamentals
-from nse_predictor.models.classical import fit_arima_forecast, fit_garch_vol
+from nse_predictor.models.classical import fit_arima_forecast, fit_garch_vol, fit_prophet_forecast
+from nse_predictor.models.lstm_direction import fit_predict_lstm_direction
 from nse_predictor.models.tabular import VolatilityModel
 from nse_predictor.serving.score import score_latest_forecasts
 from nse_predictor.training.fit import (
@@ -54,6 +60,7 @@ from nse_predictor.training.fit import (
     walk_forward_summary,
 )
 from nse_predictor.training.meta import write_model_meta
+from nse_predictor.training.mlflow_log import log_training_run
 from nse_predictor.universe import investable_equities, pick_universe, save_universe
 
 
@@ -251,11 +258,6 @@ def main() -> int:
         train, valid, feature_cols=feature_cols, target_col="y_ret_5d_xs"
     )
     results["selection"].update(ret_sel)
-    ret_bits = eval_return_model(eval_df, ret_model)
-    results["models"].update({k: v for k, v in ret_bits.items() if k != "rank_ic_return_model"})
-    if "rank_ic_return_model" in ret_bits:
-        results["diagnostics"]["rank_ic_return_model"] = ret_bits["rank_ic_return_model"]
-    ret_model.save(settings.models_dir / "return_model.joblib")
 
     try:
         raw_ret, _ = fit_return_selected(
@@ -281,21 +283,56 @@ def main() -> int:
         )
     vol_model.save(settings.models_dir / "volatility_model.joblib")
 
+    # Recalibrate return bands with predicted vol on valid, then evaluate with vol scaling.
+    valid_ret = valid.dropna(subset=[ret_model.target_col]) if len(valid) else valid
+    if len(valid_ret) >= 200:
+        v_vol = vol_model.predict(valid_ret)["pred_value"].values
+        ret_model.set_residual_quantiles(
+            valid_ret,
+            q_low=float((ret_sel.get("return_quantiles") or {}).get("p_low") or 0.10),
+            q_high=float((ret_sel.get("return_quantiles") or {}).get("p_high") or 0.90),
+            vol=v_vol,
+            target_coverage=0.80,
+            calibrate_coverage=True,
+        )
+        results["selection"]["return_quantiles"] = {
+            "q_low": ret_model.q_low_,
+            "q_high": ret_model.q_high_,
+            "p_low": ret_model.quantile_low_p_,
+            "p_high": ret_model.quantile_high_p_,
+            "target_coverage": 0.80,
+            "vol_scaled": bool(getattr(ret_model, "vol_scaled_", False)),
+            "vol_scale_ref": float(getattr(ret_model, "vol_scale_ref_", 1.0)),
+        }
+
+    ev_ret = eval_df.dropna(subset=[ret_model.target_col])
+    ev_vol = None
+    if len(ev_ret):
+        ev_vol = vol_model.predict(ev_ret)["pred_value"].values
+    ret_bits = eval_return_model(eval_df, ret_model, vol=ev_vol)
+    results["models"].update({k: v for k, v in ret_bits.items() if k != "rank_ic_return_model"})
+    if "rank_ic_return_model" in ret_bits:
+        results["diagnostics"]["rank_ic_return_model"] = ret_bits["rank_ic_return_model"]
+    ret_model.save(settings.models_dir / "return_model.joblib")
+
     per_stock = per_stock_direction(eval_df, dir_pred)
     results["diagnostics"]["per_stock"] = per_stock
     flagged = [r["stock_code"] for r in per_stock if r.get("flag")]
     results["diagnostics"]["flagged_stocks"] = flagged
     flagged_frac = len(flagged) / max(len(per_stock), 1)
     pd.DataFrame(per_stock).to_csv(reports / "per_stock_direction.csv", index=False)
-    results["diagnostics"]["rank_ic"] = rank_ic(
-        eval_df.merge(
-            dir_pred[["trade_date", "stock_code", "prob_up"]],
-            on=["trade_date", "stock_code"],
-            how="inner",
-        ),
-        "prob_up",
-        "y_ret_5d_xs",
+    ric_panel = eval_df.merge(
+        dir_pred[["trade_date", "stock_code", "prob_up"]],
+        on=["trade_date", "stock_code"],
+        how="inner",
     )
+    results["diagnostics"]["rank_ic"] = rank_ic(ric_panel, "prob_up", "y_ret_5d_xs")
+    results["diagnostics"]["rank_ic_bootstrap"] = rank_ic_bootstrap(
+        ric_panel, "prob_up", "y_ret_5d_xs", n_boot=500, seed=42
+    )
+    results["diagnostics"]["at_chance_stocks"] = [
+        r["stock_code"] for r in per_stock if r.get("flag") == "at_chance"
+    ]
 
     stress_ric, stress_acc = stress_oos_retrain(train_ready, feature_cols, dir_sel)
     results["stress_rank_ic"] = stress_ric
@@ -333,15 +370,34 @@ def main() -> int:
     try:
         px_test = prices[
             prices["stock_code"].isin(eval_df["stock_code"].unique())
-            & prices["trade_date"].isin(eval_df["trade_date"].unique())
-        ]
-        results["research_backtest"] = simulate_book_long_flat(px_test, dir_pred, cost_bps=50.0)
+            & pd.to_datetime(prices["trade_date"]).isin(pd.to_datetime(eval_df["trade_date"]))
+        ].copy()
+        bt = simulate_book_long_flat(px_test, dir_pred, cost_bps=50.0)
+        # Enrich with win_rate across names (long days only)
+        if bt.get("ok"):
+            bt["lot_size"] = 100
+            bt["cost_bps"] = 50.0
+            wins = []
+            for code, g_sig in dir_pred.groupby("stock_code"):
+                g_px = px_test[px_test["stock_code"] == code]
+                from nse_predictor.eval.backtest import simulate_long_flat
+
+                one = simulate_long_flat(g_px, g_sig, cost_bps=50.0, lot_size=100)
+                if one.get("ok") and one.get("win_rate") == one.get("win_rate"):
+                    wins.append(float(one["win_rate"]))
+            bt["win_rate"] = float(np.mean(wins)) if wins else float("nan")
+            bt["beats_buy_hold"] = bool(
+                bt.get("total_return", 0) > bt.get("buy_hold_return", 0)
+            )
+        results["research_backtest"] = bt
+        results["costed_backtest"] = bt
     except Exception as exc:  # noqa: BLE001
         results["research_backtest"] = {
             "ok": False,
             "error": str(exc),
             "disclaimer": "research_only_not_for_selection",
         }
+        results["costed_backtest"] = results["research_backtest"]
 
     sample_code = investable[0] if investable else universe[0]
     hist = prices[prices["stock_code"] == sample_code].sort_values("trade_date")
@@ -353,6 +409,19 @@ def main() -> int:
         "stock": sample_code,
         **fit_garch_vol(hist["price"].pct_change(), horizon=20),
     }
+    hist_idx = hist.set_index("trade_date")["price"]
+    results["classical"]["prophet_example"] = {
+        "stock": sample_code,
+        **fit_prophet_forecast(hist_idx, steps=5),
+    }
+
+    lgbm_acc = float(dir_test.get("accuracy") or 0)
+    lstm_res = fit_predict_lstm_direction(train, valid, eval_df, feature_cols)
+    if lstm_res.get("ok"):
+        lstm_res["lightgbm_accuracy"] = lgbm_acc
+        lstm_res["beats_lightgbm"] = bool(lstm_res.get("accuracy", 0) > lgbm_acc + 0.005)
+        lstm_res["keep_model"] = bool(lstm_res.get("beats_lightgbm") and lstm_res.get("beats_always_up"))
+    results["models"]["lstm_direction_stretch"] = lstm_res
 
     write_model_meta(
         feature_cols=feature_cols,
@@ -370,6 +439,8 @@ def main() -> int:
             "best_iteration": dir_sel.get("best_iteration"),
             "protocol_embargo": True,
             "label_horizon_days": LABEL_HORIZON_DAYS,
+            "decision_metric": dir_sel.get("decision_metric") or "utility",
+            "valid_utility": dir_sel.get("valid_utility"),
         },
     )
 
@@ -394,8 +465,44 @@ def main() -> int:
     write_validation_report(results, val_path)
     results["validation_report"] = str(val_path)
 
+    mlflow_info = log_training_run(results, models_dir=settings.models_dir)
+    results["mlflow"] = mlflow_info
+
     out_json = reports / "evaluation_results.json"
     out_json.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
+
+    # Refresh final_report costed-backtest section
+    bt = results.get("costed_backtest") or {}
+    final_md = reports / "final_report.md"
+    if final_md.exists() and bt.get("ok"):
+        extra = (
+            "\n### Costed long/flat book (test window)\n\n"
+            f"- Cost assumption: **{bt.get('cost_bps', 50)} bps** per switch; lot size note **{bt.get('lot_size', 100)}**\n"
+            f"- Strategy total return: **{float(bt.get('total_return') or 0):.1%}**\n"
+            f"- Buy-and-hold: **{float(bt.get('buy_hold_return') or 0):.1%}**\n"
+            f"- Max drawdown: **{float(bt.get('max_drawdown') or 0):.1%}**\n"
+            f"- Win rate (name avg): **{float(bt.get('win_rate') or float('nan')):.1%}**\n"
+            f"- Beats buy-and-hold: **{bt.get('beats_buy_hold')}**\n"
+            "- Research illustration only — not a trading mandate.\n"
+        )
+        text = final_md.read_text(encoding="utf-8")
+        marker = "### Costed long/flat book"
+        if marker in text:
+            pre, _, rest = text.partition(marker)
+            # drop old section until next ## 
+            idx = rest.find("\n## ")
+            text = pre + extra + (rest[idx:] if idx >= 0 else "")
+        else:
+            insert_at = text.find("## Limitations")
+            text = text[:insert_at] + extra + "\n" + text[insert_at:] if insert_at >= 0 else text + extra
+        # Fix macro limitation line when official
+        if str(macro_source) == "official":
+            text = text.replace(
+                "Macro series currently synthetic until official CBK CSVs are loaded",
+                "Macro series loaded as official (public CBK/KNBS anchors; replace with full extract as needed)",
+            )
+        final_md.write_text(text, encoding="utf-8")
+
     summary = {
         "protocol": {
             k: protocol.get(k) for k in ("embargo", "horizon_days", "train_end", "valid_end")
@@ -406,21 +513,37 @@ def main() -> int:
             for k in (
                 "direction_head",
                 "decision_mode",
+                "decision_metric",
                 "threshold",
+                "valid_utility",
                 "calibration_status",
                 "best_params",
                 "valid_rank_ic",
+                "return_quantiles",
             )
         },
         "calibration": results["diagnostics"].get("calibration"),
         "walk_forward_summary": wf_sum,
         "rank_ic": results["diagnostics"].get("rank_ic"),
+        "rank_ic_bootstrap": results["diagnostics"].get("rank_ic_bootstrap"),
+        "at_chance_stocks": results["diagnostics"].get("at_chance_stocks"),
         "stress_fragile": fragile,
-        "research_backtest": {
-            k: results["research_backtest"].get(k)
-            for k in ("ok", "total_return", "max_drawdown", "n_names", "disclaimer")
-            if isinstance(results.get("research_backtest"), dict)
+        "costed_backtest": {
+            k: (results.get("costed_backtest") or {}).get(k)
+            for k in (
+                "ok",
+                "total_return",
+                "buy_hold_return",
+                "max_drawdown",
+                "win_rate",
+                "cost_bps",
+                "lot_size",
+                "beats_buy_hold",
+                "disclaimer",
+            )
         },
+        "lstm_stretch": results["models"].get("lstm_direction_stretch"),
+        "mlflow": mlflow_info,
         "latest_score": live,
     }
     print(json.dumps(summary, indent=2, default=str))

@@ -1,7 +1,13 @@
+# Local PostgreSQL for NSE predictor (blueprint primary store).
+# Usage:
+#   docker compose up -d
+#   set DATABASE_URL=postgresql+psycopg2://nse:nse_dev@localhost:5432/nse_predictor
+#   python scripts/run_ingest.py
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nse_predictor_db
+    container_name: nse_predictor_pg
     environment:
       POSTGRES_USER: nse
       POSTGRES_PASSWORD: nse_dev
@@ -10,7 +16,7 @@ services:
       - "5432:5432"
     volumes:
       - nse_pg_data:/var/lib/postgresql/data
-      - ./scripts/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./scripts/sql/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nse -d nse_predictor"]
       interval: 5s

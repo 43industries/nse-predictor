@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-REGISTRY_VERSION = "v2.0"
+REGISTRY_VERSION = "v2.2"
 
 CORE_PRICE: list[str] = [
     "ret_1d",
@@ -27,6 +27,9 @@ RELATIVE: list[str] = [
     "stock_vs_sector_1d",
     "rsi_vs_nasi",
     "ma20_xs",
+    "nse20_ret",
+    "xs_ret_1d_nse20",
+    "stock_vs_nse20_1d",
 ]
 LIQUIDITY: list[str] = [
     "volume_chg",
@@ -37,7 +40,14 @@ LIQUIDITY: list[str] = [
     "zero_vol_streak",
     "jump_flag_1d",
 ]
-CALENDAR: list[str] = ["dow", "month", "results_season"]
+CALENDAR: list[str] = [
+    "dow",
+    "month",
+    "results_season",
+    "near_book_closure",
+    "days_since_book_closure",
+]
+NEWS: list[str] = ["news_sentiment_1d", "news_sentiment_5d", "news_count_5d"]
 MACRO_OFFICIAL: list[str] = [
     "cbk_rate",
     "cbk_chg",
@@ -54,6 +64,16 @@ FUNDAMENTALS: list[str] = [
     "div_yield_proxy",
     "book_value",
     "book_to_price",
+    "roe",
+    "roa",
+    "nim",
+    "cir",
+    "npl",
+    "pat_yoy",
+    "loan_deposit_ratio",
+    "roe_vs_bank_med",
+    "npl_vs_bank_med",
+    "pat_yoy_vs_bank_med",
 ]
 
 GROUPS: dict[str, list[str]] = {
@@ -61,6 +81,7 @@ GROUPS: dict[str, list[str]] = {
     "RELATIVE": RELATIVE,
     "LIQUIDITY": LIQUIDITY,
     "CALENDAR": CALENDAR,
+    "NEWS": NEWS,
     "MACRO_OFFICIAL": MACRO_OFFICIAL,
     "FUNDAMENTALS": FUNDAMENTALS,
 }
@@ -96,6 +117,14 @@ _FEATURE_DEFS: dict[str, str] = {
     "dow": "day of week",
     "month": "calendar month",
     "results_season": "Feb–Mar / Aug–Sep flag",
+    "near_book_closure": "1 if within book-closure window (announce≤t≤closure)",
+    "days_since_book_closure": "days since last book_closure_date",
+    "news_sentiment_1d": "mean news sentiment on trade_date (leakage-safe)",
+    "news_sentiment_5d": "5d mean news sentiment ending trade_date",
+    "news_count_5d": "news headline count over trailing 5d",
+    "nse20_ret": "1d NSE20/N20I return when series present",
+    "xs_ret_1d_nse20": "ret_1d - nse20_ret",
+    "stock_vs_nse20_1d": "alias of xs_ret_1d_nse20",
     "cbk_rate": "CBR level (official only)",
     "cbk_chg": "CBR change",
     "tbill_91d": "91d T-bill",
@@ -109,6 +138,16 @@ _FEATURE_DEFS: dict[str, str] = {
     "div_yield_proxy": "dividend / price",
     "book_value": "book value / share",
     "book_to_price": "book_value / price",
+    "roe": "as-of bank return on equity %",
+    "roa": "as-of bank return on assets %",
+    "nim": "as-of bank net interest margin %",
+    "cir": "as-of bank cost-to-income %",
+    "npl": "as-of bank NPL ratio %",
+    "pat_yoy": "as-of bank PAT YoY %",
+    "loan_deposit_ratio": "loans / deposits (as-of)",
+    "roe_vs_bank_med": "roe minus same-day bank median",
+    "npl_vs_bank_med": "npl minus same-day bank median",
+    "pat_yoy_vs_bank_med": "pat_yoy minus same-day bank median",
 }
 
 FEATURE_DOCS: dict[str, dict[str, str]] = {
@@ -147,7 +186,7 @@ def model_feature_cols(
     gset = {g.lower() for g in groups} if groups is not None else {"full"}
 
     if "full" in gset or "full_gated" in gset:
-        cols = CORE_PRICE + RELATIVE + LIQUIDITY + CALENDAR
+        cols = CORE_PRICE + RELATIVE + LIQUIDITY + CALENDAR + NEWS
         if is_official_macro(macro_source):
             cols = cols + MACRO_OFFICIAL
         if fund_included:

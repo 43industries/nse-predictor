@@ -85,8 +85,9 @@ def score_latest_forecasts(
     latest = _latest_per_stock(ready)
 
     dpred = joblib.load(dir_path).predict(latest)
-    rpred = ReturnIntervalModel.load(ret_path).predict(latest)
     vpred = VolatilityModel.load(vol_path).predict(latest)
+    ret_model = ReturnIntervalModel.load(ret_path)
+    rpred = ret_model.predict(latest, vol=vpred["pred_value"].values)
 
     forecast = latest[["trade_date", "stock_code", "price"]].merge(
         dpred, on=["trade_date", "stock_code"]

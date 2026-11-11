@@ -133,14 +133,38 @@ python scripts/collect_news.py
 
 Merged file: `data/external/news.csv` (seed sample included). The dashboard **Related news** panel filters by the sidebar stock.
 
-Postgres (optional, when Docker is available):
+### PostgreSQL (primary store when Docker is available)
 
 ```bash
 docker compose up -d
-# set DATABASE_URL in .env to postgresql+psycopg2://nse:nse_dev@localhost:5432/nse_predictor
+# .env:
+# DATABASE_URL=postgresql+psycopg2://nse:nse_dev@localhost:5432/nse_predictor
+python scripts/run_ingest.py   # writes prices/macro/sectors into Postgres + parquet cache
 ```
 
-Without Docker the default `.env` uses **SQLite** at `data/processed/nse_predictor.db`.
+Without Docker the default is **SQLite** at `data/processed/nse_predictor.db`. Parquet under `data/processed/` remains the feature/score cache either way.
+
+### Next.js dashboard (optional)
+
+```bash
+# API must be running
+cd web && npm install && npm run dev
+# http://localhost:3000  — set NEXT_PUBLIC_API_BASE if API is not on :8000
+```
+
+Streamlit remains the full research UI (`streamlit run dashboard/app.py`).
+
+### Daily scheduler
+
+- Windows: import [`scripts/windows/run_daily.xml`](scripts/windows/run_daily.xml) into Task Scheduler (edit paths).
+- Airflow: copy [`scripts/airflow_dag_run_daily.py`](scripts/airflow_dag_run_daily.py) into your `dags/` folder.
+
+### Macro / fundamentals / book closures
+
+- Macro: `data/external/macro_cbk.csv` + marker `macro_cbk.csv.official` → `macro_source=official`
+- Fundamentals: `data/external/fundamentals.csv` (investable panel)
+- Book closures: `data/external/book_closures.csv`
+- Demo next-session CSV (carry-forward, not real prints): `python scripts/make_demo_daily_csv.py` then `python scripts/run_daily.py`
 
 ## Data sources (prices 2007–2025)
 

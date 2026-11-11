@@ -9,6 +9,7 @@ from nse_predictor.features.registry import ALL_COMPUTED
 
 DEAD_ZONE_XS: float = 0.01
 NASI_CODES = ("^NASI", "NASI")
+NSE20_CODES = ("^N20I", "N20I", "NSE20", "NSE 20", "NSE-20")
 INDEX_EXCLUDE_RE = r"-R$|^\^|NASI|N20I|NSE20"
 INDEX_CODES = {"NASI", "NSE20", "NSE 20", "NSE-20", "^NASI", "^N20I", "N20I"}
 JUMP_ABS_RET = 0.40
@@ -64,6 +65,18 @@ def _nasi_price_series(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _index_ret_panel(df: pd.DataFrame, codes: tuple[str, ...], ret_col: str) -> pd.DataFrame:
+    src = df[df["stock_code"].isin(codes)].sort_values("trade_date")
+    if src.empty:
+        return pd.DataFrame(columns=["trade_date", ret_col])
+    px = (
+        src.drop_duplicates("trade_date", keep="last")[["trade_date", "price"]]
+        .sort_values("trade_date")
+        .assign(**{ret_col: lambda x: x["price"].pct_change()})
+    )
+    return px[["trade_date", ret_col]]
+
+
 def _market_panels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return (nasi_ret daily, nasi trailing feature panel)."""
     idx = df[df["stock_code"].isin(INDEX_CODES)]
@@ -87,6 +100,11 @@ def _market_panels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     nasi_panel["nasi_ret_trail_5d"] = px / px.shift(5) - 1
     nasi_panel["nasi_rsi_14"] = _rsi(px)
     nasi_panel["nasi_ma20_ratio"] = px / px.rolling(20).mean() - 1
+    nse20 = _index_ret_panel(df, NSE20_CODES, "nse20_ret")
+    if not nse20.empty:
+        market = market.merge(nse20, on="trade_date", how="left")
+    else:
+        market["nse20_ret"] = np.nan
     return market, nasi_panel
 
 
@@ -159,6 +177,10 @@ def _add_relative(df: pd.DataFrame) -> pd.DataFrame:
     df["stock_vs_sector_1d"] = df["ret_1d"] - df["sector_ret"]
     df["rsi_vs_nasi"] = df["rsi_14"] - df["nasi_rsi_14"]
     df["ma20_xs"] = df["ma20_ratio"] - df["nasi_ma20_ratio"]
+    if "nse20_ret" not in df.columns:
+        df["nse20_ret"] = np.nan
+    df["xs_ret_1d_nse20"] = df["ret_1d"] - df["nse20_ret"]
+    df["stock_vs_nse20_1d"] = df["xs_ret_1d_nse20"]
     return df
 
 
@@ -237,12 +259,39 @@ def _maybe_join_fundamentals(
         return df, False, status
 
     df = join_fundamentals_asof(df, fundamentals)
-    cov = fundamentals_coverage(df)
+    df = _add_bank_peer_features(df)
+    # Score coverage only after first knowable filing date (early history is expected NaN)
+    asof_min = pd.to_datetime(fundamentals["asof_date"]).min()
+    post = df[pd.to_datetime(df["trade_date"]) >= asof_min] if pd.notna(asof_min) else df
+    cov = fundamentals_coverage(post if len(post) else df)
     if cov >= min_fund_coverage:
-        return df, True, f"included coverage={cov:.1%}"
+        return df, True, f"included coverage={cov:.1%} (post {asof_min.date() if pd.notna(asof_min) else 'n/a'})"
     status = f"skipped low coverage={cov:.1%} < {min_fund_coverage:.0%}"
     print(f"fundamentals: {status}")
     return df, False, status
+
+
+def _add_bank_peer_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Same-day bank median relatives; NaN for non-banks."""
+    from nse_predictor.ingest.banks import BANK_TICKERS
+
+    out = df.copy()
+    code = out["stock_code"].astype(str).str.upper()
+    is_bank = code.isin(BANK_TICKERS)
+    for col, peer_col in (
+        ("roe", "roe_vs_bank_med"),
+        ("npl", "npl_vs_bank_med"),
+        ("pat_yoy", "pat_yoy_vs_bank_med"),
+    ):
+        out[peer_col] = np.nan
+        if col not in out.columns:
+            continue
+        bank_vals = out.loc[is_bank, col]
+        if bank_vals.notna().sum() == 0:
+            continue
+        med = out.loc[is_bank].groupby("trade_date", sort=False)[col].transform("median")
+        out.loc[is_bank, peer_col] = bank_vals - med
+    return out
 
 
 def build_feature_matrix(
@@ -279,6 +328,11 @@ def build_feature_matrix(
     df = _add_relative(df)
     df = _add_macro(df, macro)
     df = _add_calendar(df)
+    from nse_predictor.ingest.book_closure import join_book_closure_features
+    from nse_predictor.ingest.news_features import join_news_features
+
+    df = join_book_closure_features(df)
+    df = join_news_features(df)
     df = _add_targets(df, dead_zone_xs)
     df, fund_included, fund_status = _maybe_join_fundamentals(df, fundamentals, min_fund_coverage)
 

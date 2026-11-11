@@ -82,19 +82,47 @@ def direction_metrics_bundle(df: pd.DataFrame, model) -> tuple[dict, pd.DataFram
 
 
 def _configure_decision(model, valid: pd.DataFrame) -> dict:
-    """Calibrate + threshold on valid; fall back to ranked mode if needed."""
+    """Calibrate + utility threshold on valid; fall back to ranked mode if needed."""
     model.calibrate(valid)
     valid_pred = model.predict(valid)
+    prices = None
+    if "price" in valid.columns:
+        prices = valid[["trade_date", "stock_code", "price"]]
     tuned = tune_threshold(
         valid["y_dir_5d"].astype(int).values,
         valid_pred["prob_up"].values,
         min_threshold=0.35,
         max_threshold=0.65,
-        metric="f1",
+        metric="utility",
         reject_always_up=True,
+        prices=prices,
+        panel=valid,
+        abstain_band=float(getattr(model, "abstain_band_", ABSTAIN_BAND)),
+        cost_bps=50.0,
     )
+    # If utility path cannot score (missing prices / no accepted thr), fall back to F1.
+    if not tuned.get("found"):
+        tuned_f1 = tune_threshold(
+            valid["y_dir_5d"].astype(int).values,
+            valid_pred["prob_up"].values,
+            min_threshold=0.35,
+            max_threshold=0.65,
+            metric="f1",
+            reject_always_up=True,
+        )
+        if tuned_f1.get("found"):
+            tuned = {
+                **tuned_f1,
+                "valid_utility": float("nan"),
+                "fallback_from_utility": True,
+                "valid_rank_ic_gate": tuned.get("valid_rank_ic_gate"),
+                "brier_ref": tuned.get("brier_ref"),
+            }
+
     ric = valid_rank_ic(valid, valid_pred)
-    if tuned.get("found") and tuned.get("beats_always_up"):
+    if tuned.get("found") and tuned.get("metric") == "utility":
+        mode, thr = "threshold", float(tuned["threshold"])
+    elif tuned.get("found") and tuned.get("beats_always_up"):
         mode, thr = "threshold", float(tuned["threshold"])
     elif ric == ric and ric > 0:
         mode, thr = "ranked", 0.5
@@ -109,6 +137,8 @@ def _configure_decision(model, valid: pd.DataFrame) -> dict:
         "calibration": "isotonic" if model.calibration_status_ == "isotonic" else "none",
         "calibration_status": model.calibration_status_,
         "decision_mode": mode,
+        "decision_metric": tuned.get("metric") or "utility",
+        "valid_utility": tuned.get("valid_utility"),
         "valid_direction": valid_metrics,
         "valid_rank_ic": ric,
         "tune": tuned,
@@ -263,8 +293,16 @@ def fit_return_selected(
     }
     valid_ret = valid.dropna(subset=[probe.target_col]) if len(valid) else valid
     if len(valid_ret) >= min_valid:
-        probe.set_residual_quantiles(valid_ret, q_low=q_low, q_high=q_high)
-        pred = probe.predict(valid_ret)
+        vol_cal = valid_ret["vol_20"].astype(float).values if "vol_20" in valid_ret.columns else None
+        probe.set_residual_quantiles(
+            valid_ret,
+            q_low=q_low,
+            q_high=q_high,
+            vol=vol_cal,
+            target_coverage=0.80,
+            calibrate_coverage=True,
+        )
+        pred = probe.predict(valid_ret, vol=vol_cal)
         selection["valid_return_coverage"] = coverage(
             valid_ret[probe.target_col].values, pred["lower"].values, pred["upper"].values
         )
@@ -277,7 +315,9 @@ def fit_return_selected(
         "q_high": model.q_high_,
         "p_low": model.quantile_low_p_,
         "p_high": model.quantile_high_p_,
-        "target_coverage": model.quantile_high_p_ - model.quantile_low_p_,
+        "target_coverage": 0.80,
+        "vol_scaled": bool(getattr(model, "vol_scaled_", False)),
+        "vol_scale_ref": float(getattr(model, "vol_scale_ref_", 1.0)),
     }
     return model, selection
 

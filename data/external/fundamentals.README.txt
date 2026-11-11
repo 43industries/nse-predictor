@@ -10,7 +10,28 @@ Columns:
   eps            Earnings per share
   dividend       DPS for the period
   book_value     Book value per share
-  period         e.g. FY2023, H1-2024
+  period         e.g. FY2023, H1-2024, FY2025
+  pat            Profit after tax (KES bn) — banks
+  pat_yoy        PAT year-over-year % — banks
+  roe            Return on equity % — banks
+  roa            Return on assets % — banks
+  nim            Net interest margin % — banks
+  cir            Cost-to-income ratio % — banks
+  npl            Non-performing loan ratio % — banks
+  assets         Total assets (KES bn) — banks
+  loans          Net loans (KES bn) — banks
+  deposits       Customer deposits (KES bn) — banks
+  nii            Net interest income (KES bn) — banks
+  nfi            Non-funded / non-interest income (KES bn) — banks
+
+Bank FY seed source (no live scrape):
+  Primary: kenyanbanks.com FY2025 dashboard (balance sheet, income, ROE/ROA/NIM/CIR/PAT).
+  Secondary gap fills: Cytonn FY'2025 listed-banks report (NPL blanks; HFCK NPL)
+    and ApexHub listed FY'2025 for HFCK ROE/ROA/NIM/CIR/EPS/DPS.
+  EPS left blank when kenyanbanks omitted it and secondary prints conflict.
+  HFCK FY2025 assets/deposits are kenyanbanks estimates (~); other HF fields partial.
+
+Rewrite via: python scripts/_seed_bank_fundamentals.py
 
 Leakage: models join on publish_date (fallback report_date) backward to trade_date.
 Features included only if coverage ≥ 30% of train rows.

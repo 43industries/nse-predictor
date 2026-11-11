@@ -39,6 +39,42 @@ def fit_arima_forecast(series: pd.Series, steps: int = 5) -> dict:
         return {"ok": False, "error": str(exc)}
 
 
+def fit_prophet_forecast(series: pd.Series, steps: int = 5) -> dict:
+    """Optional Prophet baseline (skipped if prophet / cmdstanpy unavailable)."""
+    try:
+        from prophet import Prophet
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": f"prophet_unavailable: {exc}", "method": "prophet"}
+
+    y = series.dropna().astype(float)
+    if len(y) < 60:
+        return {"ok": False, "error": "insufficient history", "method": "prophet"}
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            hist = pd.DataFrame({"ds": y.index if isinstance(y.index, pd.DatetimeIndex) else pd.RangeIndex(len(y)), "y": y.values})
+            if not isinstance(y.index, pd.DatetimeIndex):
+                # Build synthetic business dates ending today
+                hist["ds"] = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=len(y))
+            else:
+                hist["ds"] = pd.to_datetime(y.index)
+            m = Prophet(daily_seasonality=False, weekly_seasonality=True, yearly_seasonality=True)
+            m.fit(hist)
+            future = m.make_future_dataframe(periods=steps, freq="B")
+            fc = m.predict(future).tail(steps)
+        last = float(y.iloc[-1])
+        terminal = float(fc["yhat"].iloc[-1])
+        return {
+            "ok": True,
+            "pred_price": terminal,
+            "pred_ret": terminal / last - 1 if last else float("nan"),
+            "method": "prophet",
+            "path": [float(x) for x in fc["yhat"]],
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc), "method": "prophet"}
+
+
 def fit_garch_vol(returns: pd.Series, horizon: int = 20) -> dict:
     """GARCH(1,1) forecast of average daily vol over horizon."""
     try:
