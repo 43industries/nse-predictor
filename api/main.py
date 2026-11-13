@@ -18,12 +18,27 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from nse_predictor.companion.desk_brief import build_desk_brief
+from nse_predictor.companion.market_board import build_market_board
+from nse_predictor.companion.movers import build_movers
 from nse_predictor.companion.paper_journal import append_entry, load_journal
 from nse_predictor.config import settings
 from nse_predictor.eval.error_history import summarize_error_history
 from nse_predictor.ingest.banks import BANK_NAMES, BANK_TICKERS
 from nse_predictor.ingest.fundamentals import load_fundamentals
 from nse_predictor.monitoring.status import load_monitor_history, load_monitor_status
+from nse_predictor.portfolio import (
+    build_nav_history,
+    build_suggestions,
+    confirm_ticket,
+    create_ticket,
+    create_tickets_batch,
+    get_book_mtm,
+    load_fills,
+    load_tickets,
+    reject_ticket,
+    reset_book,
+    seed_position,
+)
 from nse_predictor.serving.score import score_latest_forecasts
 from nse_predictor.training.meta import load_model_meta
 
@@ -61,6 +76,33 @@ class JournalIn(BaseModel):
     prob_up: float | None = None
     pred_label: str | None = None
     price: float | None = None
+
+
+class PositionSeedIn(BaseModel):
+    stock_code: str
+    shares: int = Field(..., ge=0)
+    avg_cost: float = Field(..., gt=0)
+
+
+class PortfolioResetIn(BaseModel):
+    cash_kes: float | None = Field(None, gt=0)
+
+
+class TicketIn(BaseModel):
+    stock_code: str
+    side: str = Field(..., pattern="^(buy|sell)$")
+    shares: int = Field(..., gt=0)
+    reason: str = ""
+    limit_price: float | None = None
+    suggestion_action: str | None = None
+
+
+class TicketConfirmIn(BaseModel):
+    price: float | None = Field(None, gt=0)
+
+
+class TicketBatchIn(BaseModel):
+    tickets: list[TicketIn]
 
 
 def _load_forecasts() -> pd.DataFrame:
@@ -133,6 +175,27 @@ def list_stocks():
 def all_forecasts():
     df = _require_forecasts()
     return [_forecast_row(r) for _, r in df.iterrows()]
+
+
+@app.get("/market/movers")
+def market_movers(top_n: int = 5):
+    """Session gainers / losers / absolute movers (price moves, not model signals)."""
+    return build_movers(top_n=max(1, min(int(top_n), 20)))
+
+
+@app.get("/market/board")
+def market_board():
+    """Full forecast board with hit rate, book status, and paper ticket hints."""
+    try:
+        forecasts = _load_forecasts()
+    except FileNotFoundError as exc:
+        raise HTTPException(503, f"Forecasts not ready: {exc}") from exc
+    return build_market_board(
+        forecasts,
+        evaluation=_load_eval(),
+        error_hist=_load_error_history(),
+        model_meta=load_model_meta(settings.models_dir),
+    )
 
 
 @app.get("/forecasts/{stock_code}", response_model=ForecastOut)
@@ -256,8 +319,12 @@ def company_logo(stock_code: str):
 
 
 @app.get("/companion/desk-brief")
-def companion_desk_brief(top_n: int = 5):
-    """Today's companion setups / skips (excludes at-chance names)."""
+def companion_desk_brief(
+    top_n: int = 10,
+    min_prob_up: float | None = None,
+    min_hit_rate: float | None = None,
+):
+    """Today's companion setups / skips (book-aware, paper ticket hints)."""
     try:
         forecasts = _load_forecasts()
     except FileNotFoundError as exc:
@@ -268,6 +335,8 @@ def companion_desk_brief(top_n: int = 5):
         error_hist=_load_error_history(),
         model_meta=load_model_meta(settings.models_dir),
         top_n=max(1, min(int(top_n), 20)),
+        min_prob_up=min_prob_up,
+        min_hit_rate=min_hit_rate,
     )
     return brief
 
@@ -352,6 +421,127 @@ def fundamentals_banks():
         )
     rows.sort(key=lambda x: (x.get("pat") is None, -(x.get("pat") or 0)))
     return {"banks": rows, "disclaimer": settings.disclaimer}
+
+
+@app.get("/portfolio")
+def portfolio_book():
+    """Paper book with mark-to-market (research only — not a live broker account)."""
+    return get_book_mtm()
+
+
+@app.post("/portfolio/reset")
+def portfolio_reset(body: PortfolioResetIn | None = None):
+    cash = body.cash_kes if body else None
+    reset_book(cash_kes=cash)
+    return get_book_mtm()
+
+
+@app.post("/portfolio/positions")
+def portfolio_seed_position(body: PositionSeedIn):
+    """Ops seed/replace a position without cash accounting."""
+    try:
+        seed_position(body.stock_code, body.shares, body.avg_cost)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return get_book_mtm()
+
+
+@app.get("/portfolio/suggestions")
+def portfolio_suggestions(
+    min_prob_up: float | None = None,
+    min_hit_rate: float | None = None,
+):
+    """Score-aware paper suggestions vs current book. Does not place orders."""
+    try:
+        forecasts = _load_forecasts()
+    except FileNotFoundError as exc:
+        raise HTTPException(503, f"Forecasts not ready: {exc}") from exc
+    return build_suggestions(
+        forecasts,
+        evaluation=_load_eval(),
+        model_meta=load_model_meta(settings.models_dir),
+        error_hist=_load_error_history(),
+        min_prob_up=min_prob_up,
+        min_hit_rate=min_hit_rate,
+    )
+
+
+@app.get("/portfolio/nav-history")
+def portfolio_nav_history(days: int = 90):
+    """Daily paper NAV series from fill replay + mark-to-market."""
+    n = max(1, min(int(days), 730))
+    return build_nav_history(days=n)
+
+
+@app.get("/portfolio/tickets")
+def portfolio_tickets(status: str | None = None):
+    tickets = load_tickets()
+    if status:
+        want = status.strip().lower()
+        tickets = [t for t in tickets if str(t.get("status")).lower() == want]
+    return {"tickets": tickets, "disclaimer": settings.disclaimer, "mode": "paper"}
+
+
+@app.post("/portfolio/tickets")
+def portfolio_create_ticket(body: TicketIn):
+    try:
+        ticket = create_ticket(
+            stock_code=body.stock_code,
+            side=body.side,
+            shares=body.shares,
+            reason=body.reason or "",
+            limit_price=body.limit_price,
+            suggestion_action=body.suggestion_action,
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ticket": ticket, "disclaimer": settings.disclaimer, "mode": "paper"}
+
+
+@app.post("/portfolio/tickets/batch")
+def portfolio_create_tickets_batch(body: TicketBatchIn):
+    """Create many pending tickets; partial success OK."""
+    items = [t.model_dump() for t in (body.tickets or [])]
+    return create_tickets_batch(items)
+
+
+@app.post("/portfolio/tickets/{ticket_id}/confirm")
+def portfolio_confirm_ticket(ticket_id: str, body: TicketConfirmIn | None = None):
+    """Human-confirmed paper fill at last close (or provided price)."""
+    try:
+        result = confirm_ticket(
+            ticket_id,
+            price=body.price if body else None,
+            source="manual",
+        )
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    result["disclaimer"] = settings.disclaimer
+    return result
+
+
+@app.post("/portfolio/tickets/{ticket_id}/reject")
+def portfolio_reject_ticket(ticket_id: str):
+    try:
+        ticket = reject_ticket(ticket_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"ticket": ticket, "disclaimer": settings.disclaimer, "mode": "paper"}
+
+
+@app.get("/portfolio/fills")
+def portfolio_fills(limit: int = 50):
+    fills = load_fills()
+    n = max(1, min(int(limit), 500))
+    return {
+        "fills": list(reversed(fills[-n:])),
+        "disclaimer": settings.disclaimer,
+        "mode": "paper",
+    }
 
 
 @app.post("/score/latest")

@@ -46,3 +46,7 @@ Thumbs.db
 # Reports generated
 reports/figures/
 !reports/.gitkeep
+
+# Next.js
+web/tsconfig.tsbuildinfo
+web/.next/

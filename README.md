@@ -48,10 +48,25 @@ uvicorn api.main:app --reload --app-dir .
 # accuracy: GET /accuracy/SCOM
 # live score: POST /score/latest
 # daily refresh: POST /admin/refresh
+# paper portfolio: GET /portfolio · GET /portfolio/suggestions · POST /portfolio/tickets
 
-# Dashboard (watchlist + per-stock hit rate)
-streamlit run dashboard/app.py
+# Primary UI (Next.js) — http://localhost:3000
+cd web && npm install && npm run dev
+
+# Optional research UI (Streamlit)
+# streamlit run dashboard/app.py
 ```
+
+## Paper portfolio desk
+
+Research-only paper book (not live brokerage, not investment advice):
+
+- Store: `data/processed/portfolio/` (`book.json`, `tickets.json`, `fills.json`)
+- Brain: score-aware open/add/hold/trim/exit vs cash, lot size, max names/weight, min cash buffer
+- Execution: human **confirm** / **reject** tickets → paper fills at last close (or explicit price)
+- **Primary UI:** Next.js **Portfolio** at http://localhost:3000/portfolio (API under `/portfolio/*`)
+- Streamlit Portfolio tab remains as an optional research mirror
+- Live broker routing is intentionally stubbed until a licensed dealing-member adapter is configured
 
 ## Daily collector (drop-folder, no scrape)
 
@@ -144,15 +159,16 @@ python scripts/run_ingest.py   # writes prices/macro/sectors into Postgres + par
 
 Without Docker the default is **SQLite** at `data/processed/nse_predictor.db`. Parquet under `data/processed/` remains the feature/score cache either way.
 
-### Next.js dashboard (optional)
+### Next.js dashboard (primary UI)
 
 ```bash
-# API must be running
+# API must be running on :8000
 cd web && npm install && npm run dev
-# http://localhost:3000  — set NEXT_PUBLIC_API_BASE if API is not on :8000
+# http://localhost:3000  — Portfolio at /portfolio
+# set NEXT_PUBLIC_API_BASE if API is not on :8000
 ```
 
-Streamlit remains the full research UI (`streamlit run dashboard/app.py`).
+Streamlit (`streamlit run dashboard/app.py`) remains an optional research mirror while React catches full parity.
 
 ### Daily scheduler
 

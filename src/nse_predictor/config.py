@@ -54,5 +54,15 @@ class Settings(BaseSettings):
     ]
     index_tickers: list[str] = ["NASI", "NSE20", "NSE 20", "NSE-20"]
 
+    # Paper portfolio (research desk — not live brokerage)
+    portfolio_starting_cash: float = 1_000_000.0
+    portfolio_lot_size: int = 100
+    portfolio_cost_bps: float = 50.0
+    portfolio_max_names: int = 8
+    portfolio_max_weight_pct: float = 0.15
+    portfolio_min_cash_pct: float = 0.10
+    portfolio_min_prob_up: float = 0.55
+    portfolio_exit_prob_up: float = 0.45
+
 
 settings = Settings()

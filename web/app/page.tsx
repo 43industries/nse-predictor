@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Disclaimer } from "../components/Disclaimer";
 import { KpiStrip } from "../components/KpiStrip";
 import { SetupTable } from "../components/SetupTable";
+import { SignalFilters } from "../components/SignalFilters";
 import { SkipList } from "../components/SkipList";
+import { StatusBanners } from "../components/StatusBanners";
 import { StockLink } from "../components/StockLink";
 import {
   ApiError,
@@ -14,6 +17,8 @@ import {
   type SetupRow,
 } from "../lib/api";
 import { pct } from "../lib/format";
+import { ticketFromSuggestion } from "../lib/paperTicket";
+import { PREF_KEYS, loadNumber, saveNumber } from "../lib/prefs";
 
 export default function DeskBriefPage() {
   const [brief, setBrief] = useState<DeskBrief | null>(null);
@@ -22,21 +27,38 @@ export default function DeskBriefPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [minProb, setMinProb] = useState(0.55);
+  const [minHit, setMinHit] = useState(0.52);
+
+  useEffect(() => {
+    setMinProb(loadNumber(PREF_KEYS.minProbUp, 0.55));
+    setMinHit(loadNumber(PREF_KEYS.minHitRate, 0.52));
+  }, []);
 
   const load = useCallback(async () => {
     try {
       setError("");
-      const [b, j] = await Promise.all([api.deskBrief(), api.journal()]);
+      const [b, j] = await Promise.all([
+        api.deskBrief({ top_n: 10, min_prob_up: minProb, min_hit_rate: minHit }),
+        api.journal(),
+      ]);
       setBrief(b);
       setJournal(j.entries || []);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load desk brief");
     }
-  }, []);
+  }, [minProb, minHit]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  function persistFilters(nextProb: number, nextHit: number) {
+    setMinProb(nextProb);
+    setMinHit(nextHit);
+    saveNumber(PREF_KEYS.minProbUp, nextProb);
+    saveNumber(PREF_KEYS.minHitRate, nextHit);
+  }
 
   async function onLog(row: SetupRow, stance: "long" | "skip") {
     setBusy(`${row.stock_code}:${stance}`);
@@ -61,6 +83,22 @@ export default function DeskBriefPage() {
     }
   }
 
+  async function onTicket(row: SetupRow) {
+    setBusy(`${row.stock_code}:ticket`);
+    setMsg("");
+    setError("");
+    try {
+      const res = await ticketFromSuggestion(row, "desk_brief");
+      setMsg(
+        `Pending paper ticket ${res.ticket.id}: ${row.suggested_side} ${row.stock_code} × ${row.suggested_shares}`
+      );
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : "Ticket failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <main>
       <p className="brand-tag">Nairobi Securities Exchange</p>
@@ -68,12 +106,24 @@ export default function DeskBriefPage() {
         NSE <span>Predictor</span>
       </h1>
       <p className="lede">
-        Today&apos;s desk brief — ranked setups, honest skips, and a paper journal. Research companion
-        only; you decide.
+        Today&apos;s desk brief — ranked setups, book-aware sizing hints, and a paper journal.
+        Research companion only. <strong>Ticket</strong> creates a pending paper order (not live) —
+        confirm on{" "}
+        <Link href="/portfolio" className="ticker-link">
+          Portfolio
+        </Link>
+        .
       </p>
 
-      {error && <div className="error-banner">{error}</div>}
-      {msg && <p className="muted">{msg}</p>}
+      <StatusBanners error={error} msg={msg} portfolioLink={msg.includes("Pending paper ticket")} />
+
+      <SignalFilters
+        minProb={minProb}
+        minHit={minHit}
+        onMinProb={(v) => persistFilters(v, minHit)}
+        onMinHit={(v) => persistFilters(minProb, v)}
+        onRefresh={() => load()}
+      />
 
       {brief && (
         <>
@@ -82,7 +132,10 @@ export default function DeskBriefPage() {
               { label: "As of", value: brief.as_of || "—" },
               { label: "Setups", value: String(brief.n_setups) },
               { label: "Skips", value: String(brief.n_skips) },
-              { label: "Model thr", value: Number(brief.threshold).toFixed(2) },
+              {
+                label: "Entry thr",
+                value: Number(brief.filters?.entry_threshold ?? brief.threshold).toFixed(2),
+              },
             ]}
           />
 
@@ -93,7 +146,7 @@ export default function DeskBriefPage() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-          <SetupTable rows={brief.setups} onLog={onLog} busy={busy} />
+          <SetupTable rows={brief.setups} onLog={onLog} onTicket={onTicket} busy={busy} />
 
           <p className="section-label">Skips</p>
           <SkipList skips={brief.skips} />

@@ -1547,6 +1547,144 @@ def _fmt_bn(val) -> str:
     return f"{v:.1f}"
 
 
+def render_portfolio_desk(
+    forecasts: pd.DataFrame,
+    evaluation: dict,
+    model_meta: dict | None = None,
+) -> None:
+    """Paper portfolio brain + human-confirmed tickets (not live brokerage)."""
+    from nse_predictor.portfolio import (
+        build_suggestions,
+        confirm_ticket,
+        create_ticket,
+        get_book_mtm,
+        load_fills,
+        load_tickets,
+        reject_ticket,
+        reset_book,
+    )
+
+    st.markdown('<p class="section-label">Portfolio desk — paper book</p>', unsafe_allow_html=True)
+    st.caption(
+        "Paper portfolio only. Suggestions are research actions against your book — "
+        "not investment advice, not live order routing. Confirm tickets yourself."
+    )
+
+    book = get_book_mtm()
+    m1, m2, m3, m4, m5 = st.columns(5)
+    m1.metric("NAV (KES)", f"{float(book.get('nav_kes') or 0):,.0f}")
+    m2.metric("Cash", f"{float(book.get('cash_kes') or 0):,.0f}")
+    m3.metric("Equity", f"{float(book.get('equity_kes') or 0):,.0f}")
+    m4.metric("Unrealized P&L", f"{float(book.get('unrealized_pnl_kes') or 0):,.0f}")
+    m5.metric("Names", int(book.get("n_names") or 0))
+
+    with st.expander("Reset / seed cash", expanded=False):
+        cash_in = st.number_input(
+            "Starting cash (KES)",
+            min_value=10_000.0,
+            value=float(settings.portfolio_starting_cash),
+            step=50_000.0,
+        )
+        if st.button("Reset paper book", type="secondary"):
+            reset_book(cash_kes=float(cash_in))
+            st.success("Paper book reset.")
+            st.rerun()
+
+    positions = book.get("positions") or []
+    st.markdown('<p class="section-label">Positions</p>', unsafe_allow_html=True)
+    if not positions:
+        st.info("No positions yet. Create tickets from suggestions below, then confirm fills.")
+    else:
+        pos_df = pd.DataFrame(positions)
+        show = pos_df.copy()
+        for col in ("avg_cost", "last_price", "market_value", "unrealized_pnl"):
+            if col in show.columns:
+                show[col] = show[col].map(
+                    lambda v: f"{float(v):,.2f}" if v is not None and v == v else "—"
+                )
+        if "weight" in show.columns:
+            show["weight"] = show["weight"].map(
+                lambda v: f"{float(v):.1%}" if v is not None and v == v else "—"
+            )
+        st.dataframe(show, use_container_width=True, hide_index=True)
+
+    suggestions = build_suggestions(
+        forecasts,
+        evaluation=evaluation,
+        model_meta=model_meta,
+    )
+    st.markdown('<p class="section-label">Suggestions</p>', unsafe_allow_html=True)
+    st.caption(
+        f"As of {suggestions.get('as_of') or '—'} · "
+        f"{int(suggestions.get('n_suggestions') or 0)} actionable · "
+        f"lot={settings.portfolio_lot_size}"
+    )
+    sug = suggestions.get("suggestions") or []
+    actionable = [s for s in sug if s.get("action") in {"open", "add", "trim", "exit"}]
+    if not actionable:
+        st.info("No actionable suggestions vs current book / filters.")
+    else:
+        for s in actionable:
+            code = s["stock_code"]
+            action = s["action"]
+            side = s.get("side")
+            shares = int(s.get("shares") or 0)
+            c1, c2, c3, c4 = st.columns([2, 2, 3, 2])
+            c1.markdown(f"**{code}** · {action}")
+            c2.write(
+                f"P(up) {float(s.get('prob_up') or 0):.0%} · "
+                f"{shares} sh · {side or '—'}"
+            )
+            c3.caption(str(s.get("reason") or ""))
+            if side and shares > 0:
+                if c4.button("Ticket", key=f"sug_ticket_{code}_{action}_{shares}"):
+                    try:
+                        create_ticket(
+                            stock_code=code,
+                            side=side,
+                            shares=shares,
+                            reason=str(s.get("reason") or ""),
+                            suggestion_action=action,
+                        )
+                        st.success(f"Pending {side} ticket: {code} × {shares}")
+                        st.rerun()
+                    except ValueError as exc:
+                        st.error(str(exc))
+
+    st.markdown('<p class="section-label">Pending tickets</p>', unsafe_allow_html=True)
+    pending = [t for t in load_tickets() if t.get("status") == "pending"]
+    if not pending:
+        st.caption("No pending tickets.")
+    else:
+        for t in pending:
+            tid = t["id"]
+            c1, c2, c3, c4 = st.columns([3, 2, 2, 2])
+            c1.write(
+                f"`{tid}` · **{t['side'].upper()}** {t['stock_code']} × {t['shares']}"
+            )
+            c2.caption(str(t.get("reason") or t.get("suggestion_action") or ""))
+            if c3.button("Confirm fill", key=f"confirm_{tid}"):
+                try:
+                    confirm_ticket(tid, source="dashboard")
+                    st.success("Filled (paper).")
+                    st.rerun()
+                except (KeyError, ValueError) as exc:
+                    st.error(str(exc))
+            if c4.button("Reject", key=f"reject_{tid}"):
+                try:
+                    reject_ticket(tid)
+                    st.rerun()
+                except (KeyError, ValueError) as exc:
+                    st.error(str(exc))
+
+    with st.expander("Fill ledger", expanded=False):
+        fills = load_fills()
+        if not fills:
+            st.caption("No fills yet.")
+        else:
+            st.dataframe(pd.DataFrame(list(reversed(fills[-40:]))), use_container_width=True, hide_index=True)
+
+
 def render_desk_brief(
     forecasts: pd.DataFrame,
     evaluation: dict,
@@ -2451,7 +2589,14 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    tab_labels = ["My market", "Desk brief", "Stock detail", "Banks", "Model health"]
+    tab_labels = [
+        "My market",
+        "Desk brief",
+        "Portfolio",
+        "Stock detail",
+        "Banks",
+        "Model health",
+    ]
     default_tab = prefs.get("main_tab") if prefs.get("main_tab") in tab_labels else "My market"
     if "main_tab" not in st.session_state:
         st.session_state["main_tab"] = default_tab
@@ -2524,6 +2669,9 @@ def main() -> None:
             prefs,
             model_meta=model_meta,
         )
+
+    elif nav == "Portfolio":
+        render_portfolio_desk(forecasts, evaluation, model_meta=model_meta)
 
     elif nav == "Stock detail":
         st.markdown(

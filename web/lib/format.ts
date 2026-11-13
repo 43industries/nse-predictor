@@ -25,6 +25,14 @@ export function num(v: number | null | undefined, digits = 1): string {
   return Number(v).toFixed(digits);
 }
 
+export function kes(v: number | null | undefined, digits = 0): string {
+  if (v == null || Number.isNaN(Number(v))) return "—";
+  return Number(v).toLocaleString("en-KE", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
+
 export function fmtChecked(v: unknown): string {
   if (v == null || v === "") return "";
   return String(v).slice(0, 19);
