@@ -14,6 +14,7 @@ Internal decision-support research for NSE equities. **Not investment advice.**
 4. Baselines: always-up, MA(5/20) cross, tomorrow=today (zero return)  
 5. Models: LightGBM direction / 5d excess return intervals / 20d volatility; LSTM stretch; ARIMA & GARCH examples  
 6. Time split train ≤2019 / valid 2020–2022 / test 2023+; yearly walk-forward; stress slices  
+7. Feature-preset ablation selects on **valid Rank IC** (accuracy tie-break) — aligned with direction-head / gate metrics  
 
 ## Universe (liquid ordinary shares)
 
@@ -21,49 +22,63 @@ Internal decision-support research for NSE equities. **Not investment advice.**
 
 Bank candidates with FY2025 metrics on file but not forced into the book unless liquidity admits: SCBK, DTK, IMH, SBIC.
 
-## Bank fundamentals upgrade
+## Feature selection (Rank IC first)
 
-- Seeded FY2025 bank rows for EQTY, KCB, COOP, ABSA, NCBA, IMH, SBIC, SCBK, DTK (`reports/fundamentals_qa.md`).  
-- Feature ablation on **valid**: `core_relative` won (acc **57.7%**, Rank IC **0.114**).  
-- `full_gated` (includes bank metrics + peers + macro/news/liquidity) had valid acc **56.0%** but higher Rank IC **0.146**.  
-- Selected production head therefore uses **core_relative** (bank features available in the panel / dashboard, not in the selected LightGBM feature list).  
-- Primary value of the upgrade: **dashboard bank as-of strip** + QA + richer CSV for future ablations / longer-horizon work.
+- Selection metric: **`valid_rank_ic`** (then accuracy). See `reports/feature_ablation.json`.  
+- **`full_gated`** won (59 features; valid Rank IC **0.146**, acc **56.0%**).  
+- `core_relative` remains higher accuracy on valid (**57.7%**) but lower Rank IC (**0.114**).  
+- Direction-head ablation on that feature set selected **LightGBM ranker** (valid Rank IC **0.169** vs binary **0.166**).  
+
+### Holdout outcome vs prior `core_relative` + binary
+
+The Rank-IC feature rule is correct and kept; **test direction quality degraded** under `full_gated` + ranker:
+
+| Metric | Prior (`core_relative` / binary) | This run (`full_gated` / ranker) |
+| --- | ---: | ---: |
+| Test accuracy (non-flat) | 55.1% | **50.0%** |
+| Test Rank IC | 0.166 | **0.114** |
+| Walk-forward mean Rank IC | 0.141 | **0.123** |
+| Beats always-up folds | 7/8 | **5/8** |
+| Abstain rate | ~10% | **~27%** |
+| Flagged names | ~47% | **100%** (`validation_status=warn`) |
+
+Confusion on test non-flat rows: **TP 0 / FP 0** — thresholded ranker issued no `up` calls (only down / flat). Prefer prior production behavior for desk use until a follow-up (e.g. constrain head to binary, or Rank-IC select among presets that also pass utility / non-degenerate confusion gates).
 
 ## Results vs baselines (test, scored non-flat)
 
 | Model | Metric | Value | Baseline | Beats? |
 | --- | --- | ---: | ---: | --- |
-| LightGBM direction | Accuracy | **55.1%** | Always-up 50.8% | **Yes** (+4.3 pp) |
-| LightGBM 5d excess return | MAE | 0.0457 | Zero-excess 0.0455 | **No** |
-| LightGBM 20d vol | MAE | 0.0109 | — | — |
+| LightGBM direction (ranker) | Accuracy | **50.0%** | Always-up 50.0% | **Marginal** (+0.05 pp) |
+| LightGBM 5d excess return | MAE | 0.0455 | Zero-excess 0.0455 | **No** |
+| LightGBM 20d vol | MAE | 0.0297 | — | — |
 
 ### Walk-forward
 
-- Mean Rank IC ≈ **0.141**; IC-positive folds **8/8**; beat always-up on **7/8** folds (`evaluation_results.json`).
+- Mean Rank IC ≈ **0.123**; IC-positive folds **8/8**; beat always-up on **5/8** folds (`evaluation_results.json`).
 
 ### Where the model does **not** beat the baseline
 
 - **5-day return point forecasts** do not beat naïve zero-excess on MAE. Prefer **direction probabilities** and **intervals**.  
-- Costed long/flat book still trails buy-and-hold (research illustration only).
-
-
+- Costed long/flat book still trails buy-and-hold (research illustration only).  
+- This run’s direction head is not usable as an “up” ticker filter (zero up predictions on test).
 
 ### Costed long/flat book (test window)
 
 - Cost assumption: **50.0 bps** per switch; lot size note **100**
-- Strategy total return: **94.1%**
+- Strategy total return: **0.0%**
 - Buy-and-hold: **170.7%**
-- Max drawdown: **-5.1%**
-- Win rate (name avg): **48.6%**
+- Max drawdown: **0.0%**
+- Win rate (name avg): **nan%**
 - Beats buy-and-hold: **False**
 - Research illustration only — not a trading mandate.
 
 ## Limitations
 
 - Short-horizon equity direction remains noisy; many 5d moves are still misclassified  
-- Bank FY metrics are sparse historically (mostly FY2025 seed) — limited train-period signal  
+- Bank FY metrics are sparse historically (mostly FY2025 seed) — `full_gated` spends capacity on often-missing fundamentals  
 - Rights issues and illiquids excluded; results do not generalize to thin counters  
 - No live licensed market-data scrape of kenyanbanks.com  
+- Rank-IC-only feature selection can promote sparse high-IC presets that fail utility / confusion gates on holdout  
 
 ## Demo checklist
 
@@ -73,6 +88,7 @@ Bank candidates with FY2025 metrics on file but not forced into the book unless 
 - [x] Disclaimer on API and dashboard  
 - [x] Fundamentals QA report  
 - [x] Evaluation JSON reviewed  
+- [x] Feature ablation selects on Rank IC  
 
 ## How to rerun
 

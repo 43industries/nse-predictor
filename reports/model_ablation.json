@@ -1,25 +1,24 @@
 {
   "binary": {
-    "valid_rank_ic": 0.14704424068888208,
+    "valid_rank_ic": 0.1662421615731986,
     "best_params": {
-      "num_leaves": 31,
-      "min_child_samples": 40,
+      "num_leaves": 15,
+      "min_child_samples": 60,
       "learning_rate": 0.05,
-      "colsample_bytree": 0.7,
       "n_estimators": 500
     },
     "tune_info": {
-      "best_rank_ic": 0.11733519589536118,
+      "best_rank_ic": 0.14309995638910158,
       "n_trials": 8
     },
     "decision_mode": "threshold",
     "calibration_status": "isotonic"
   },
   "ranker": {
-    "valid_rank_ic": 0.10707054062832061,
+    "valid_rank_ic": 0.1689474449617732,
     "decision_mode": "threshold",
     "calibration_status": "isotonic"
   },
-  "selected": "binary",
-  "selected_rank_ic": 0.14704424068888208
+  "selected": "ranker",
+  "selected_rank_ic": 0.1689474449617732
 }

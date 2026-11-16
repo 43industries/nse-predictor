@@ -17,6 +17,92 @@ _flag_map = flag_map
 _model_threshold = model_threshold
 _suggest_size = suggest_size
 
+SKIP_LABELS = {
+    "at_chance": "Model unreliable on this name",
+    "thin_n": "Too little history to trust",
+    "flat": "Sitting out",
+    "low_conviction": "Below confidence bar",
+    "low_hit_rate": "Recent accuracy too low",
+}
+
+
+def skip_label(reason: str | None) -> str:
+    key = str(reason or "").strip().lower()
+    return SKIP_LABELS.get(key, "Skipped for today")
+
+
+def _label_counts(rows: list[dict]) -> tuple[int, int, int]:
+    n_up = n_down = n_flat = 0
+    for row in rows:
+        lab = str(row.get("pred_label") or "").lower()
+        if lab == "up":
+            n_up += 1
+        elif lab == "down":
+            n_down += 1
+        elif lab == "flat":
+            n_flat += 1
+    return n_up, n_down, n_flat
+
+
+def _headline(n_setups: int, n_up: int, n_down: int, n_flat: int) -> str:
+    if n_setups <= 0:
+        return f"No buy setups. {n_flat} flat, {n_down} down."
+    if n_setups == 1:
+        return f"1 setup above the confidence bar ({n_up} up · {n_flat} flat · {n_down} down)."
+    return f"{n_setups} setups above the confidence bar ({n_up} up · {n_flat} flat · {n_down} down)."
+
+
+def _watchlist(rows: list[dict], setup_codes: set[str], n: int = 3) -> list[dict[str, Any]]:
+    ranked = sorted(
+        rows,
+        key=lambda r: float(r["prob_up"]) if r.get("prob_up") is not None else -1.0,
+        reverse=True,
+    )
+    out: list[dict[str, Any]] = []
+    for row in ranked[:n]:
+        reason = row.get("skip_reason")
+        out.append(
+            {
+                "stock_code": row["stock_code"],
+                "prob_up": row.get("prob_up"),
+                "pred_label": row.get("pred_label"),
+                "skip_reason": reason,
+                "skip_label": skip_label(reason) if reason else None,
+                "in_setups": row["stock_code"] in setup_codes,
+            }
+        )
+    return out
+
+
+def _summary(
+    *,
+    as_of: str | None,
+    setups: list[dict],
+    skips: list[dict],
+    rows: list[dict],
+    entry_thr: float,
+    min_prob: float,
+    min_hit: float,
+    n_at_chance: int,
+) -> dict[str, Any]:
+    n_up, n_down, n_flat = _label_counts(rows)
+    n_names = len(rows)
+    caution = n_names > 0 and (n_at_chance / n_names) >= 0.40
+    return {
+        "as_of": as_of,
+        "n_setups": len(setups),
+        "n_skips": len(skips),
+        "n_up": n_up,
+        "n_down": n_down,
+        "n_flat": n_flat,
+        "entry_threshold": entry_thr,
+        "min_prob_up": min_prob,
+        "min_hit_rate": min_hit,
+        "n_at_chance": n_at_chance,
+        "model_caution": caution,
+        "headline": _headline(len(setups), n_up, n_down, n_flat),
+    }
+
 
 def build_desk_brief(
     forecasts: pd.DataFrame,
@@ -39,6 +125,16 @@ def build_desk_brief(
     min_hit = float(min_hit_rate if min_hit_rate is not None else 0.52)
     entry_thr = max(thr, min_prob)
 
+    empty_summary = _summary(
+        as_of=None,
+        setups=[],
+        skips=[],
+        rows=[],
+        entry_thr=entry_thr,
+        min_prob=min_prob,
+        min_hit=min_hit,
+        n_at_chance=0,
+    )
     empty = {
         "as_of": None,
         "n_setups": 0,
@@ -53,6 +149,8 @@ def build_desk_brief(
         },
         "setups": [],
         "skips": [],
+        "summary": empty_summary,
+        "watchlist": [],
         "disclaimer": disclaimer,
     }
     if forecasts is None or forecasts.empty:
@@ -152,19 +250,26 @@ def build_desk_brief(
         flagged = code in chance or row.get("flag") in ("at_chance", "thin_n")
 
         if flagged:
-            skips.append({**row, "skip_reason": row.get("flag") or "at_chance"})
+            reason = row.get("flag") or "at_chance"
+            skips.append({**row, "skip_reason": reason, "skip_label": skip_label(reason)})
             continue
         if label == "flat":
-            skips.append({**row, "skip_reason": "flat"})
+            skips.append({**row, "skip_reason": "flat", "skip_label": skip_label("flat")})
             continue
         if prob is None or prob < entry_thr:
-            skips.append({**row, "skip_reason": "low_conviction"})
+            skips.append(
+                {**row, "skip_reason": "low_conviction", "skip_label": skip_label("low_conviction")}
+            )
             continue
         if held_shares == 0 and hr is not None and float(hr) < min_hit:
-            skips.append({**row, "skip_reason": "low_hit_rate"})
+            skips.append(
+                {**row, "skip_reason": "low_hit_rate", "skip_label": skip_label("low_hit_rate")}
+            )
             continue
         if label != "up" and not (prob is not None and prob >= entry_thr):
-            skips.append({**row, "skip_reason": "low_conviction"})
+            skips.append(
+                {**row, "skip_reason": "low_conviction", "skip_label": skip_label("low_conviction")}
+            )
             continue
         setups.append(row)
 
@@ -178,6 +283,33 @@ def build_desk_brief(
     setups = setups[: int(top_n)]
     skips.sort(key=lambda x: str(x.get("stock_code") or ""))
 
+    # Attach skip_reason on full row list for watchlist ranking context
+    skip_by_code = {s["stock_code"]: s for s in skips}
+    annotated = []
+    for row in rows:
+        if row["stock_code"] in skip_by_code:
+            annotated.append(skip_by_code[row["stock_code"]])
+        else:
+            annotated.append(row)
+
+    n_at_chance = sum(
+        1
+        for s in skips
+        if str(s.get("skip_reason") or "") in ("at_chance", "thin_n")
+        or s.get("flag") in ("at_chance", "thin_n")
+    )
+    setup_codes = {s["stock_code"] for s in setups}
+    summary = _summary(
+        as_of=as_of_s,
+        setups=setups,
+        skips=skips,
+        rows=rows,
+        entry_thr=entry_thr,
+        min_prob=min_prob,
+        min_hit=min_hit,
+        n_at_chance=n_at_chance,
+    )
+
     return {
         "as_of": as_of_s,
         "n_setups": len(setups),
@@ -186,5 +318,7 @@ def build_desk_brief(
         "filters": empty["filters"],
         "setups": setups,
         "skips": skips,
+        "summary": summary,
+        "watchlist": _watchlist(annotated, setup_codes, n=3),
         "disclaimer": disclaimer,
     }

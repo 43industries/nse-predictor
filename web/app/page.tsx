@@ -5,7 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Disclaimer } from "../components/Disclaimer";
 import { KpiStrip } from "../components/KpiStrip";
 import { SetupTable } from "../components/SetupTable";
-import { SignalFilters } from "../components/SignalFilters";
+import {
+  FILTER_PRESETS,
+  SignalFilters,
+  type FilterPreset,
+} from "../components/SignalFilters";
 import { SkipList } from "../components/SkipList";
 import { StatusBanners } from "../components/StatusBanners";
 import { StockLink } from "../components/StockLink";
@@ -60,6 +64,11 @@ export default function DeskBriefPage() {
     saveNumber(PREF_KEYS.minHitRate, nextHit);
   }
 
+  function applyPreset(preset: Exclude<FilterPreset, "custom">) {
+    const p = FILTER_PRESETS[preset];
+    persistFilters(p.minProb, p.minHit);
+  }
+
   async function onLog(row: SetupRow, stance: "long" | "skip") {
     setBusy(`${row.stock_code}:${stance}`);
     setMsg("");
@@ -99,6 +108,9 @@ export default function DeskBriefPage() {
     }
   }
 
+  const summary = brief?.summary;
+  const entryThr = Number(summary?.entry_threshold ?? brief?.filters?.entry_threshold ?? brief?.threshold ?? 0);
+
   return (
     <main>
       <p className="brand-tag">Nairobi Securities Exchange</p>
@@ -117,11 +129,36 @@ export default function DeskBriefPage() {
 
       <StatusBanners error={error} msg={msg} portfolioLink={msg.includes("Pending paper ticket")} />
 
+      {brief && summary ? (
+        <p className="desk-status">
+          <strong>As of {summary.as_of || brief.as_of || "—"}.</strong> {summary.headline}{" "}
+          <span className="muted">
+            Minimum confidence to act: {pct(entryThr, 0)}.
+          </span>
+        </p>
+      ) : null}
+
+      {summary?.model_caution ? (
+        <div className="caution-banner">
+          Model is cautious today — many names are marked unreliable. Prefer{" "}
+          <Link href="/market" className="ticker-link">
+            Market
+          </Link>{" "}
+          or{" "}
+          <Link href="/portfolio" className="ticker-link">
+            Portfolio
+          </Link>{" "}
+          over forcing tickets.
+        </div>
+      ) : null}
+
       <SignalFilters
         minProb={minProb}
         minHit={minHit}
+        showPresets
         onMinProb={(v) => persistFilters(v, minHit)}
         onMinHit={(v) => persistFilters(minProb, v)}
+        onPreset={applyPreset}
         onRefresh={() => load()}
       />
 
@@ -130,11 +167,11 @@ export default function DeskBriefPage() {
           <KpiStrip
             items={[
               { label: "As of", value: brief.as_of || "—" },
-              { label: "Setups", value: String(brief.n_setups) },
+              { label: "Buy setups", value: String(brief.n_setups) },
               { label: "Skips", value: String(brief.n_skips) },
               {
-                label: "Entry thr",
-                value: Number(brief.filters?.entry_threshold ?? brief.threshold).toFixed(2),
+                label: "Confidence bar",
+                value: pct(entryThr, 0),
               },
             ]}
           />
@@ -146,7 +183,14 @@ export default function DeskBriefPage() {
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
-          <SetupTable rows={brief.setups} onLog={onLog} onTicket={onTicket} busy={busy} />
+          <SetupTable
+            rows={brief.setups}
+            summary={summary}
+            watchlist={brief.watchlist}
+            onLog={onLog}
+            onTicket={onTicket}
+            busy={busy}
+          />
 
           <p className="section-label">Skips</p>
           <SkipList skips={brief.skips} />
@@ -154,7 +198,9 @@ export default function DeskBriefPage() {
           <p className="section-label">Paper journal</p>
           <div className="panel" style={{ overflowX: "auto" }}>
             {journal.length === 0 ? (
-              <p className="muted">No paper entries yet. Use Log long / Log skip on a setup.</p>
+              <p className="muted">
+                No paper entries yet. Open Journal on a setup to log long or skip.
+              </p>
             ) : (
               <table className="data-table">
                 <thead>
@@ -163,7 +209,7 @@ export default function DeskBriefPage() {
                     <th>As of</th>
                     <th>Stock</th>
                     <th>Stance</th>
-                    <th>P(up)</th>
+                    <th>Chance up</th>
                     <th>Note</th>
                   </tr>
                 </thead>

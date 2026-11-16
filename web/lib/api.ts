@@ -97,12 +97,37 @@ export type SetupRow = {
   hit_rate?: number | null;
   flag?: string | null;
   skip_reason?: string | null;
+  skip_label?: string | null;
   held_shares?: number | null;
   weight?: number | null;
   book_status?: "flat" | "held" | "overweight" | string | null;
   suggested_side?: "buy" | "sell" | null;
   suggested_shares?: number | null;
   suggest_note?: string | null;
+};
+
+export type DeskWatchlistItem = {
+  stock_code: string;
+  prob_up?: number | null;
+  pred_label?: string | null;
+  skip_reason?: string | null;
+  skip_label?: string | null;
+  in_setups?: boolean;
+};
+
+export type DeskBriefSummary = {
+  as_of?: string | null;
+  n_setups: number;
+  n_skips: number;
+  n_up: number;
+  n_down: number;
+  n_flat: number;
+  entry_threshold: number;
+  min_prob_up: number;
+  min_hit_rate: number;
+  n_at_chance: number;
+  model_caution: boolean;
+  headline: string;
 };
 
 export type DeskBrief = {
@@ -119,6 +144,8 @@ export type DeskBrief = {
   };
   setups: SetupRow[];
   skips: SetupRow[];
+  summary?: DeskBriefSummary;
+  watchlist?: DeskWatchlistItem[];
   disclaimer: string;
 };
 

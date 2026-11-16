@@ -20,14 +20,19 @@ def select_feature_preset(
     macro_source: str,
     fund_included: bool,
 ) -> tuple[str, list[str], dict]:
-    """Pick preset by valid accuracy, then Rank IC."""
+    """Pick preset by valid Rank IC, then accuracy."""
     best_name = "full_gated"
     best_cols = model_feature_cols(macro_source=macro_source, fund_included=fund_included)
     best_score = (-1.0, -1.0)
     rows: list[dict] = []
 
     if valid.empty or int(valid["y_dir_5d"].notna().sum()) < 200:
-        return best_name, best_cols, {"skipped": True, "reason": "valid too small", "presets": []}
+        return best_name, best_cols, {
+            "skipped": True,
+            "reason": "valid too small",
+            "selection_metric": "valid_rank_ic",
+            "presets": [],
+        }
 
     for name, groups in ABLATION_PRESETS.items():
         cols = [
@@ -61,13 +66,18 @@ def select_feature_preset(
                 "valid_rank_ic": ric,
             }
         )
-        score = (acc, ric_m)
+        score = (ric_m, acc)
         if score > best_score:
             best_score = score
             best_name = name
             best_cols = cols
 
-    return best_name, best_cols, {"skipped": False, "presets": rows, "selected": best_name}
+    return best_name, best_cols, {
+        "skipped": False,
+        "selection_metric": "valid_rank_ic",
+        "presets": rows,
+        "selected": best_name,
+    }
 
 
 def write_ablation_report(
