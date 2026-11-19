@@ -12,19 +12,19 @@
     "n_test_eval": 9662
   },
   "calibration": {
-    "brier": 0.25217217200462083,
-    "ece": 0.0594929967384221,
-    "mean_prob_up": 0.44871425925313124,
-    "std_prob_up": 0.07650325513898805,
-    "n_unique_probs": 13,
-    "n": 7073,
-    "abstain_rate": 0.26795694473193954,
-    "n_flat": 2589
+    "brier": 0.2808681290742272,
+    "ece": 0.15445587539006278,
+    "mean_prob_up": 0.46598177303802213,
+    "std_prob_up": 0.21190213283207404,
+    "n_unique_probs": 138,
+    "n": 8940,
+    "abstain_rate": 0.07472572966259573,
+    "n_flat": 722
   },
   "walk_forward_summary": {
-    "wf_mean_rank_ic": 0.12313927782133031,
-    "wf_folds_ic_positive": 8,
-    "wf_folds_beat_always_up": 5,
+    "wf_mean_rank_ic": 0.13074611204032344,
+    "wf_folds_ic_positive": 7,
+    "wf_folds_beat_always_up": 7,
     "n_folds": 8
   },
   "stress_rank_ic": {
@@ -36,10 +36,10 @@
       "abstain_rate": 0.16494478090488066
     },
     "fx_2023": {
-      "mean_ic": 0.06347069748864607,
-      "median_ic": 0.0857142857142857,
+      "mean_ic": 0.05910717404342555,
+      "median_ic": 0.07352941176470588,
       "n_days": 243,
-      "ic_std": 0.29904379810302395,
+      "ic_std": 0.2998321630062424,
       "abstain_rate": 0.08356460067838421
     }
   },
@@ -47,37 +47,37 @@
   "validation_gates": {
     "status": "warn",
     "reasons": [
-      "flagged_frac=100% \u2265 40%"
+      "flagged_frac=47% \u2265 40%"
     ],
     "flags": [
       "per_stock_flags"
     ],
-    "test_rank_ic": 0.11432119213186151,
-    "wf_mean_rank_ic": 0.12313927782133031,
+    "test_rank_ic": 0.11756146870654283,
+    "wf_mean_rank_ic": 0.13074611204032344,
     "stress_fragile": false,
-    "flagged_frac": 1.0,
-    "return_coverage": 0.8699027116539019,
+    "flagged_frac": 0.47058823529411764,
+    "return_coverage": 0.8707306975781411,
     "macro_source": "official"
   },
   "research_backtest": {
     "ok": true,
     "disclaimer": "research_only_not_for_selection",
     "n_names": 17,
-    "total_return": 0.0,
+    "total_return": 0.41483783510652517,
     "buy_hold_return": 1.7065753130314225,
-    "max_drawdown": 0.0,
-    "n_trades": 0,
+    "max_drawdown": -0.06759852345310535,
+    "n_trades": 1282,
     "cost_bps": 50.0,
-    "mean_name_total_return": 0.0,
+    "mean_name_total_return": 0.40723714885504725,
     "lot_size": 100,
-    "win_rate": NaN,
+    "win_rate": 0.4596259797954141,
     "beats_buy_hold": false
   },
   "rank_ic": {
-    "mean_ic": 0.11432119213186151,
-    "median_ic": 0.12153951512500608,
-    "n_days": 734,
-    "ic_std": 0.2891230518690668
+    "mean_ic": 0.11756146870654283,
+    "median_ic": 0.12570391510702866,
+    "n_days": 727,
+    "ic_std": 0.28849173419226726
   },
-  "abstain_rate": 0.26795694473193954
+  "abstain_rate": 0.07472572966259573
 }

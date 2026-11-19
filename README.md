@@ -136,28 +136,31 @@ Use only logos you have rights to display. Cached/local files are embedded as da
 
 ## Stock news (drop-folder)
 
-Curated headlines for the selected ticker (no scraping):
+Curated headlines for the selected ticker (**no website scrape** — licensing-safe):
 
-1. Drop CSVs into `data/external/news/incoming/` with columns  
-   `stock_code,date,headline,source,url,sentiment` (`sentiment` optional: positive/neutral/negative)
+1. Drop CSVs into `data/external/news/incoming/` **or** `data/raw/news/incoming/` with columns  
+   `stock_code,date,headline,source,url,sentiment` (`sentiment` optional: positive/neutral/negative).  
+   A template lives at `data/external/news/incoming/TEMPLATE_news.csv`.
 2. Run:
 
 ```bash
 python scripts/collect_news.py
 ```
 
-Merged file: `data/external/news.csv` (seed sample included). The dashboard **Related news** panel filters by the sidebar stock.
+Merged file: `data/external/news.csv`. `run_daily.py` also soft-runs the news collector. The dashboard **Related news** panel filters by ticker.
 
-### PostgreSQL (primary store when Docker is available)
+### PostgreSQL (blueprint primary store)
+
+Preferred when Docker Desktop is installed:
 
 ```bash
 docker compose up -d
-# .env:
-# DATABASE_URL=postgresql+psycopg2://nse:nse_dev@localhost:5432/nse_predictor
-python scripts/run_ingest.py   # writes prices/macro/sectors into Postgres + parquet cache
+# Copy .env.example → .env (DATABASE_URL already points at compose Postgres)
+python scripts/run_ingest.py          # parquet cache + DB sync
+python scripts/sync_processed_to_db.py  # prices/macro/sectors/fundamentals/forecasts
 ```
 
-Without Docker the default is **SQLite** at `data/processed/nse_predictor.db`. Parquet under `data/processed/` remains the feature/score cache either way.
+Without Docker the runtime default is **SQLite** at `data/processed/nse_predictor.db` (sync still works). Parquet under `data/processed/` remains the feature/score cache either way. Live vendor scraping is intentionally out of scope — use the drop-folder collectors.
 
 ### Next.js dashboard (primary UI)
 
@@ -208,7 +211,7 @@ See [docs/data_dictionary.md](docs/data_dictionary.md). After download, check `d
 
 **ML problem:** 5-day **excess return vs NASI** direction with a **±1% dead zone** (flat excess moves excluded from labels). Return intervals still target raw 5d return. Investable universe is liquidity-/price-screened (`reports/universe_investable.json`).
 
-Baselines → ARIMA/GARCH → LightGBM. Keep complexity only if it beats MA / majority baselines on walk-forward and shows positive Rank IC. SHAP explains tree drivers on the dashboard.
+Baselines → ARIMA/GARCH → LightGBM / XGBoost binary (+ LightGBM ranker). Feature presets and direction heads are selected on **valid Rank IC** subject to **ship gates** (must beat always-up and emit both up/down labels). Keep complexity only if it passes gates on walk-forward. SHAP explains tree drivers on the dashboard.
 
 ## Repo layout
 
@@ -223,6 +226,18 @@ reports/             Evaluation JSON + final report
 scripts/             Download, ingest, train
 src/nse_predictor/   Library code
 ```
+
+## Blueprint checklist
+
+- [x] Clean NSE + macro dataset (+ data dictionary)  
+- [x] Notebooks for EDA / features  
+- [x] Train + walk-forward + baselines (+ ship gates, XGBoost ablation)  
+- [x] FastAPI daily forecasts  
+- [x] Dashboard (React primary; Streamlit optional)  
+- [x] Final report vs baselines / limitations  
+- [x] Git + README rerun path  
+- [x] Postgres sync path (`docker compose` + `sync_processed_to_db.py`; SQLite fallback)  
+- [x] Licensing-safe live data via drop-folders (prices + news) — no vendor scrape  
 
 ## Cite
 

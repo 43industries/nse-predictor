@@ -66,6 +66,11 @@
   "macro_excluded": [],
   "skipped": false,
   "selection_metric": "valid_rank_ic",
+  "selection_gates": [
+    "non_degenerate_labels",
+    "beats_always_up"
+  ],
+  "n_gated_winners": 3,
   "presets": [
     {
       "preset": "core_only",
@@ -89,13 +94,21 @@
         "near_book_closure",
         "days_since_book_closure"
       ],
-      "valid_accuracy": 0.5494756911344137,
+      "valid_accuracy": 0.5750273822562979,
       "valid_rank_ic": {
-        "mean_ic": 0.09630811424470616,
-        "median_ic": 0.09807370556736847,
+        "mean_ic": 0.10478742807584177,
+        "median_ic": 0.11641824983299286,
         "n_days": 639,
-        "ic_std": 0.2949532546975742
-      }
+        "ic_std": 0.2945249525574622
+      },
+      "beats_always_up": true,
+      "label_counts": {
+        "n_up": 65,
+        "n_down": 3587,
+        "n_flat": 4645
+      },
+      "passes_gates": true,
+      "rejected_reason": null
     },
     {
       "preset": "core_relative",
@@ -128,13 +141,21 @@
         "xs_ret_1d_nse20",
         "stock_vs_nse20_1d"
       ],
-      "valid_accuracy": 0.5771720613287905,
+      "valid_accuracy": 0.6112562336737117,
       "valid_rank_ic": {
-        "mean_ic": 0.11358225870622467,
-        "median_ic": 0.10723864871956167,
-        "n_days": 639,
-        "ic_std": 0.32088357887059854
-      }
+        "mean_ic": 0.1259323861114853,
+        "median_ic": 0.1290404549482373,
+        "n_days": 629,
+        "ic_std": 0.31464120901290804
+      },
+      "beats_always_up": true,
+      "label_counts": {
+        "n_up": 1235,
+        "n_down": 2976,
+        "n_flat": 4086
+      },
+      "passes_gates": true,
+      "rejected_reason": null
     },
     {
       "preset": "full_gated",
@@ -200,13 +221,22 @@
         "npl_vs_bank_med",
         "pat_yoy_vs_bank_med"
       ],
-      "valid_accuracy": 0.5602372984484332,
+      "valid_accuracy": 0.6012108980827447,
       "valid_rank_ic": {
-        "mean_ic": 0.14550257045934822,
-        "median_ic": 0.15452542814763082,
+        "mean_ic": 0.15298212780276016,
+        "median_ic": 0.16506225030671215,
         "n_days": 639,
-        "ic_std": 0.30031796130477334
-      }
+        "ic_std": 0.2963477123428058
+      },
+      "beats_always_up": true,
+      "label_counts": {
+        "n_up": 630,
+        "n_down": 4325,
+        "n_flat": 3342
+      },
+      "passes_gates": true,
+      "rejected_reason": null
     }
-  ]
+  ],
+  "selected_passes_gates": true
 }

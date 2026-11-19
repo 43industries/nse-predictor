@@ -21,6 +21,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 NEWS_DIR = ROOT / "data" / "external" / "news"
 INCOMING = NEWS_DIR / "incoming"
+# Alias drop folder (mirrors prices collector layout)
+INCOMING_ALT = ROOT / "data" / "raw" / "news" / "incoming"
 ARCHIVE = INCOMING / "archive"
 MASTER = ROOT / "data" / "external" / "news.csv"
 STATUS = ROOT / "data" / "processed" / "news_collection_status.json"
@@ -71,13 +73,20 @@ def _normalize(df: pd.DataFrame) -> pd.DataFrame:
 
 def collect_news() -> dict:
     INCOMING.mkdir(parents=True, exist_ok=True)
+    INCOMING_ALT.mkdir(parents=True, exist_ok=True)
     ARCHIVE.mkdir(parents=True, exist_ok=True)
     STATUS.parent.mkdir(parents=True, exist_ok=True)
 
-    files = sorted(INCOMING.glob("*.csv"))
+    # Skip template files; collect from both drop folders
+    files = [
+        p
+        for p in sorted(list(INCOMING.glob("*.csv")) + list(INCOMING_ALT.glob("*.csv")))
+        if not p.name.upper().startswith("TEMPLATE")
+    ]
     errors: list[str] = []
     processed: list[str] = []
     frames: list[pd.DataFrame] = []
+    sources: dict[str, Path] = {}
 
     if not files:
         status = {
@@ -85,7 +94,7 @@ def collect_news() -> dict:
             "rows_added": 0,
             "files_processed": [],
             "errors": [],
-            "note": "No CSV files in data/external/news/incoming/",
+            "note": "No CSV files in data/external/news/incoming/ or data/raw/news/incoming/",
             "master": str(MASTER.relative_to(ROOT)).replace("\\", "/"),
         }
         STATUS.write_text(json.dumps(status, indent=2), encoding="utf-8")
@@ -96,6 +105,7 @@ def collect_news() -> dict:
             raw = pd.read_csv(path)
             frames.append(_normalize(raw))
             processed.append(path.name)
+            sources[path.name] = path
         except Exception as exc:  # noqa: BLE001
             errors.append(f"{path.name}: {exc}")
 
@@ -128,7 +138,7 @@ def collect_news() -> dict:
         combined.to_csv(MASTER, index=False)
 
     for name in processed:
-        src = INCOMING / name
+        src = sources.get(name) or (INCOMING / name)
         if src.exists():
             dest = ARCHIVE / f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')}_{name}"
             shutil.move(str(src), str(dest))

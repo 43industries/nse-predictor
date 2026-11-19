@@ -1,24 +1,48 @@
 {
+  "selection_gates": [
+    "non_degenerate_labels",
+    "beats_always_up"
+  ],
+  "prefer_binary_on_gate_tie": true,
   "binary": {
-    "valid_rank_ic": 0.1662421615731986,
+    "valid_rank_ic": 0.14861906243036788,
     "best_params": {
       "num_leaves": 15,
-      "min_child_samples": 60,
-      "learning_rate": 0.05,
+      "min_child_samples": 40,
+      "learning_rate": 0.08,
       "n_estimators": 500
     },
     "tune_info": {
-      "best_rank_ic": 0.14309995638910158,
+      "best_rank_ic": 0.13676876364224033,
       "n_trials": 8
     },
     "decision_mode": "threshold",
-    "calibration_status": "isotonic"
+    "calibration_status": "isotonic",
+    "valid_utility": 0.13818335947726568,
+    "beats_always_up": true,
+    "passes_gates": true,
+    "rejected_reason": null
   },
   "ranker": {
-    "valid_rank_ic": 0.1689474449617732,
+    "valid_rank_ic": 0.13625897903914663,
     "decision_mode": "threshold",
-    "calibration_status": "isotonic"
+    "calibration_status": "isotonic",
+    "valid_utility": 0.0,
+    "beats_always_up": true,
+    "passes_gates": false,
+    "rejected_reason": "degenerate_labels up=0 down=3380"
   },
-  "selected": "ranker",
-  "selected_rank_ic": 0.1689474449617732
+  "xgb_binary": {
+    "valid_rank_ic": 0.15053172718656238,
+    "best_params": {},
+    "decision_mode": "threshold",
+    "calibration_status": "isotonic",
+    "valid_utility": 0.00559242216967859,
+    "beats_always_up": true,
+    "passes_gates": true,
+    "rejected_reason": null
+  },
+  "selected": "xgb_binary",
+  "selected_rank_ic": 0.15053172718656238,
+  "selected_passes_gates": true
 }

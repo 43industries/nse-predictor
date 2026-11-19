@@ -17,7 +17,9 @@ from nse_predictor.models.tabular import (
     DirectionRankModel,
     ReturnIntervalModel,
     HAS_LGBM,
+    HAS_XGB,
 )
+from nse_predictor.training.selection_gates import gate_direction_candidate
 from nse_predictor.training.tune import tune_direction, tune_regressor
 
 MIN_VALID = 200
@@ -162,19 +164,24 @@ def fit_direction_selected(
     feature_cols: list[str] | None = None,
     params: dict | None = None,
     tune: bool = True,
+    backend: str = "lightgbm",
+    head_name: str | None = None,
 ) -> tuple[DirectionModel, dict]:
     """Train binary direction with optional tuning; decision layer on valid."""
     best_params = params or {}
     tune_info: dict = {}
-    if tune and len(valid) >= min_valid:
+    # Tuning grid is LightGBM-oriented; skip for xgboost (use defaults).
+    if tune and backend != "xgboost" and len(valid) >= min_valid:
         best_params, tune_info = tune_direction(train, valid, feature_cols)
 
     fit_base = train if len(train) else valid
-    probe = DirectionModel(feature_cols=feature_cols, params=best_params)
+    probe = DirectionModel(feature_cols=feature_cols, params=best_params, backend=backend)
     probe.fit(fit_base, eval_df=valid if len(valid) >= 100 else None)
 
+    name = head_name or ("xgb_binary" if backend == "xgboost" else "binary")
     selection: dict = {
-        "direction_head": "binary",
+        "direction_head": name,
+        "backend": backend,
         "best_params": best_params,
         "tune_info": {
             "best_rank_ic": tune_info.get("best_rank_ic"),
@@ -193,7 +200,7 @@ def fit_direction_selected(
         probe.set_decision_mode("threshold")
         selection.update(_default_decision())
 
-    model = DirectionModel(feature_cols=feature_cols, params=best_params)
+    model = DirectionModel(feature_cols=feature_cols, params=best_params, backend=backend)
     model.fit(_concat_tv(train, valid) if len(valid) else fit_base, early_stopping_rounds=None)
     model.copy_decision_from(probe)
     selection["scale_pos_weight"] = model.scale_pos_weight_
@@ -225,37 +232,125 @@ def select_direction_head(
     valid: pd.DataFrame,
     feature_cols: list[str] | None = None,
 ) -> tuple[object, dict, dict]:
-    """Ablate binary vs ranker on probe-stage valid Rank IC."""
-    bin_model, bin_sel = fit_direction_selected(train, valid, feature_cols=feature_cols, tune=True)
-    bin_ic = _finite(bin_sel.get("valid_rank_ic"))
+    """Ablate LGBM binary / LGBM ranker / XGB binary under Rank IC + ship gates."""
+    candidates: list[tuple[str, object, dict]] = []
     ablation: dict = {
-        "binary": {
-            "valid_rank_ic": bin_ic,
-            "best_params": bin_sel.get("best_params"),
-            "tune_info": bin_sel.get("tune_info"),
-            "decision_mode": bin_sel.get("decision_mode"),
-            "calibration_status": bin_sel.get("calibration_status"),
-        },
+        "selection_gates": ["non_degenerate_labels", "beats_always_up"],
+        "prefer_binary_on_gate_tie": True,
     }
-    winner_model, winner_sel, winner_name, best_ic = bin_model, bin_sel, "binary", (
-        bin_ic if bin_ic == bin_ic else -1.0
+
+    bin_model, bin_sel = fit_direction_selected(
+        train, valid, feature_cols=feature_cols, tune=True, backend="lightgbm", head_name="binary"
     )
+    # Label degeneracy check on valid
+    _, bin_pred = direction_metrics_bundle(valid, bin_model)
+    bin_pass, bin_reason = gate_direction_candidate(
+        valid_metrics=bin_sel.get("valid_direction") or {},
+        pred_label=bin_pred["pred_label"],
+        valid_utility=bin_sel.get("valid_utility"),
+    )
+    ablation["binary"] = {
+        "valid_rank_ic": _finite(bin_sel.get("valid_rank_ic")),
+        "best_params": bin_sel.get("best_params"),
+        "tune_info": bin_sel.get("tune_info"),
+        "decision_mode": bin_sel.get("decision_mode"),
+        "calibration_status": bin_sel.get("calibration_status"),
+        "valid_utility": bin_sel.get("valid_utility"),
+        "beats_always_up": (bin_sel.get("valid_direction") or {}).get("beats_always_up"),
+        "passes_gates": bin_pass,
+        "rejected_reason": bin_reason,
+    }
+    candidates.append(("binary", bin_model, bin_sel))
 
     try:
         rk_model, rk_sel = fit_direction_ranker_selected(train, valid, feature_cols=feature_cols)
-        rk_ic = _finite(rk_sel.get("valid_rank_ic"))
+        _, rk_pred = direction_metrics_bundle(valid, rk_model)
+        rk_pass, rk_reason = gate_direction_candidate(
+            valid_metrics=rk_sel.get("valid_direction") or {},
+            pred_label=rk_pred["pred_label"],
+            valid_utility=rk_sel.get("valid_utility"),
+        )
         ablation["ranker"] = {
-            "valid_rank_ic": rk_ic,
+            "valid_rank_ic": _finite(rk_sel.get("valid_rank_ic")),
             "decision_mode": rk_sel.get("decision_mode"),
             "calibration_status": rk_sel.get("calibration_status"),
+            "valid_utility": rk_sel.get("valid_utility"),
+            "beats_always_up": (rk_sel.get("valid_direction") or {}).get("beats_always_up"),
+            "passes_gates": rk_pass,
+            "rejected_reason": rk_reason,
         }
-        if rk_ic == rk_ic and rk_ic > best_ic:
-            winner_model, winner_sel, winner_name, best_ic = rk_model, rk_sel, "ranker", rk_ic
+        candidates.append(("ranker", rk_model, rk_sel))
     except Exception as exc:  # noqa: BLE001
-        ablation["ranker"] = {"error": str(exc)}
+        ablation["ranker"] = {"error": str(exc), "passes_gates": False, "rejected_reason": str(exc)}
+
+    if HAS_XGB:
+        try:
+            xgb_model, xgb_sel = fit_direction_selected(
+                train,
+                valid,
+                feature_cols=feature_cols,
+                tune=False,
+                backend="xgboost",
+                head_name="xgb_binary",
+            )
+            _, xgb_pred = direction_metrics_bundle(valid, xgb_model)
+            xgb_pass, xgb_reason = gate_direction_candidate(
+                valid_metrics=xgb_sel.get("valid_direction") or {},
+                pred_label=xgb_pred["pred_label"],
+                valid_utility=xgb_sel.get("valid_utility"),
+            )
+            ablation["xgb_binary"] = {
+                "valid_rank_ic": _finite(xgb_sel.get("valid_rank_ic")),
+                "best_params": xgb_sel.get("best_params"),
+                "decision_mode": xgb_sel.get("decision_mode"),
+                "calibration_status": xgb_sel.get("calibration_status"),
+                "valid_utility": xgb_sel.get("valid_utility"),
+                "beats_always_up": (xgb_sel.get("valid_direction") or {}).get("beats_always_up"),
+                "passes_gates": xgb_pass,
+                "rejected_reason": xgb_reason,
+            }
+            candidates.append(("xgb_binary", xgb_model, xgb_sel))
+        except Exception as exc:  # noqa: BLE001
+            ablation["xgb_binary"] = {
+                "error": str(exc),
+                "passes_gates": False,
+                "rejected_reason": str(exc),
+            }
+    else:
+        ablation["xgb_binary"] = {
+            "error": "xgboost_not_installed",
+            "passes_gates": False,
+            "rejected_reason": "xgboost_not_installed",
+        }
+
+    gated = [
+        (name, model, sel)
+        for name, model, sel in candidates
+        if (ablation.get(name) or {}).get("passes_gates")
+    ]
+    pool = gated if gated else candidates
+
+    def _score(item: tuple[str, object, dict]) -> tuple[float, int]:
+        name, _m, sel = item
+        ic = _finite(sel.get("valid_rank_ic"))
+        ic = ic if ic == ic else -1.0
+        # Prefer binary on ties (higher secondary key)
+        prefer = 1 if name == "binary" else 0
+        return (ic, prefer)
+
+    pool_sorted = sorted(pool, key=_score, reverse=True)
+    winner_name, winner_model, winner_sel = pool_sorted[0]
+    best_ic = _finite(winner_sel.get("valid_rank_ic"))
 
     ablation["selected"] = winner_name
     ablation["selected_rank_ic"] = best_ic
+    ablation["selected_passes_gates"] = bool((ablation.get(winner_name) or {}).get("passes_gates"))
+    if not gated:
+        ablation["fallback"] = "no_gated_winner_used_best_rank_ic"
+        if winner_name in ablation and isinstance(ablation[winner_name], dict):
+            ablation[winner_name].setdefault("rejected_reason", "fallback_no_gated_winner")
+
+    winner_sel = dict(winner_sel)
     winner_sel["direction_head"] = winner_name
     if not winner_sel.get("best_params"):
         winner_sel["best_params"] = bin_sel.get("best_params") or {}

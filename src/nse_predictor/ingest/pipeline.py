@@ -8,7 +8,6 @@ from pathlib import Path
 import pandas as pd
 
 from nse_predictor.config import settings
-from nse_predictor.db.session import init_db
 from nse_predictor.ingest.macro import resolve_macro
 from nse_predictor.ingest.prices import clean_prices, load_raw_prices, load_sectors
 
@@ -56,32 +55,13 @@ def run_ingest(
     )
 
     if use_db:
-        engine = init_db()
-        prices_db = prices[
-            [
-                "trade_date",
-                "stock_code",
-                "stock_name",
-                "low_12m",
-                "high_12m",
-                "day_low",
-                "day_high",
-                "day_close",
-                "prev_price",
-                "change_value",
-                "change_pct",
-                "volume",
-                "adj_price",
-                "source_file",
-            ]
-        ].copy()
-        prices_db["trade_date"] = pd.to_datetime(prices_db["trade_date"]).dt.date
-        with engine.begin() as conn:
-            prices_db.to_sql("prices", conn, if_exists="replace", index=False)
-            sectors.to_sql("sectors", conn, if_exists="replace", index=False)
-            macro_db = macro.copy()
-            macro_db["observe_date"] = pd.to_datetime(macro_db["observe_date"]).dt.date
-            macro_db.to_sql("macro", conn, if_exists="replace", index=False)
+        from nse_predictor.db.sync import sync_processed_to_db
+
+        # Write parquet first (already done), then full DB sync including
+        # fundamentals + latest_forecasts when present.
+        summary_db = sync_processed_to_db()
+        meta["db_sync"] = summary_db.get("tables")
+        meta["db_dialect"] = summary_db.get("database_url_dialect")
 
     summary = {
         **meta,

@@ -109,10 +109,17 @@ def main() -> int:
     )
 
     mon = run("run_monitor.py", soft_fail=True) or {}
+    db_sync = run("sync_processed_to_db.py", soft_fail=True) or {}
+    # Optional news drop-folder (licensing-safe; no scrape)
+    news = run("collect_news.py", soft_fail=True) or {}
     summary = {
         "collect": collect,
         "qa": qa,
         "score": score,
+        "db_sync": db_sync,
+        "news": {
+            k: news.get(k) for k in ("files_processed", "rows_added", "n_master") if k in news
+        },
         "coverage_pct": cov,
         "coverage_ok": cov is None or cov >= 80,
         "monitor_status": mon.get("status") if isinstance(mon, dict) else None,

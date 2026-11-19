@@ -20,6 +20,27 @@ except Exception:  # noqa: BLE001
     HAS_LGBM = False
     LGBMRanker = None  # type: ignore
 
+try:
+    from xgboost import XGBClassifier
+
+    HAS_XGB = True
+except Exception:  # noqa: BLE001
+    HAS_XGB = False
+    XGBClassifier = None  # type: ignore
+
+DEFAULT_XGB_CLF = {
+    "n_estimators": 400,
+    "learning_rate": 0.05,
+    "max_depth": 5,
+    "min_child_weight": 40,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "n_jobs": 4,
+    "eval_metric": "logloss",
+}
+
 from nse_predictor.features.registry import ALL_COMPUTED, available_features
 
 FEATURE_COLS = list(ALL_COMPUTED)
@@ -172,10 +193,17 @@ class DirectionModel(_DirectionDecisionMixin):
         feature_cols: list[str] | None = None,
         params: dict | None = None,
         abstain_band: float = ABSTAIN_BAND,
+        backend: str = "lightgbm",
     ):
+        self.backend = (backend or "lightgbm").lower()
+        if self.backend == "xgboost":
+            model_name = model_name if model_name != "lightgbm_direction" else "xgboost_direction"
+            base = DEFAULT_XGB_CLF
+        else:
+            base = DEFAULT_LGBM_CLF
         self.model_name = model_name
         self.feature_cols = feature_cols
-        self.params = {**DEFAULT_LGBM_CLF, **(params or {})}
+        self.params = {**base, **(params or {})}
         self.features: list[str] = []
         self.threshold_: float = 0.5
         self.abstain_band_: float = float(abstain_band)
@@ -187,7 +215,12 @@ class DirectionModel(_DirectionDecisionMixin):
         self.pipe = self._make_pipe()
 
     def _make_pipe(self, scale_pos_weight: float = 1.0) -> Pipeline:
-        if HAS_LGBM:
+        if self.backend == "xgboost" and HAS_XGB:
+            p = {k: v for k, v in self.params.items() if k not in ("early_stopping_rounds", "num_leaves")}
+            # XGB uses scale_pos_weight similarly
+            p["scale_pos_weight"] = scale_pos_weight
+            clf = XGBClassifier(**p)
+        elif HAS_LGBM and self.backend != "xgboost":
             p = {k: v for k, v in self.params.items() if k != "early_stopping_rounds"}
             p["scale_pos_weight"] = scale_pos_weight
             clf = LGBMClassifier(**p)
@@ -224,16 +257,34 @@ class DirectionModel(_DirectionDecisionMixin):
 
         model = self.pipe.named_steps["model"]
         use_es = (
-            HAS_LGBM
-            and early_stopping_rounds
+            early_stopping_rounds
             and eval_df is not None
             and eval_df["y_dir_5d"].notna().sum() >= 100
+            and (
+                (HAS_LGBM and self.backend != "xgboost")
+                or (HAS_XGB and self.backend == "xgboost")
+            )
         )
         if use_es:
             X_fit = self.pipe.named_steps["imputer"].fit_transform(X)
             ev = eval_df.dropna(subset=["y_dir_5d"])
             X_ev = self.pipe.named_steps["imputer"].transform(ev[self.features])
-            fit_kw: dict = {"eval_set": [(X_ev, ev["y_dir_5d"].astype(int))], "callbacks": []}
+            y_ev = ev["y_dir_5d"].astype(int)
+            if self.backend == "xgboost" and HAS_XGB:
+                fit_kw: dict = {
+                    "eval_set": [(X_ev, y_ev)],
+                    "verbose": False,
+                }
+                if sw is not None:
+                    fit_kw["sample_weight"] = sw
+                try:
+                    model.fit(X_fit, y, **fit_kw)
+                except TypeError:
+                    fit_kw.pop("verbose", None)
+                    model.fit(X_fit, y, **fit_kw)
+                self.best_iteration_ = getattr(model, "best_iteration", None)
+                return self
+            fit_kw = {"eval_set": [(X_ev, y_ev)], "callbacks": []}
             try:
                 from lightgbm import early_stopping, log_evaluation
 
@@ -261,9 +312,10 @@ class DirectionModel(_DirectionDecisionMixin):
 
     def raw_proba(self, df: pd.DataFrame) -> np.ndarray:
         X = df[self.features]
-        if HAS_LGBM and hasattr(self.pipe.named_steps["model"], "predict_proba"):
+        model = self.pipe.named_steps["model"]
+        if hasattr(model, "predict_proba"):
             Xi = self.pipe.named_steps["imputer"].transform(X)
-            return self.pipe.named_steps["model"].predict_proba(Xi)[:, 1]
+            return model.predict_proba(Xi)[:, 1]
         return self.pipe.predict_proba(X)[:, 1]
 
     def shap_summary(self, df: pd.DataFrame, max_rows: int = 500) -> pd.DataFrame | None:
